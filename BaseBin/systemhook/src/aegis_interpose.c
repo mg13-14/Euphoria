@@ -233,24 +233,9 @@ static int aegis_posix_spawn_hook(pid_t *restrict pid, const char *restrict path
 }
 
 /* ------------------------------------------------------------------------ */
-/* Mount enumeration hiding (complement to cloak; per-app)                  */
-/* ------------------------------------------------------------------------ */
-
-static int (*aegis_getfsent_orig)(struct statfs *) = NULL;
-static int aegis_getfsent_hook(struct statfs *buf)
-{
-	int r = aegis_getfsent_orig(buf);
-	(void)r;
-	/* If this entry is a jailbreak artefact, skip to the next by recursing
-	 * once. getfsent is iterative (one entry per call); skipping means
-	 * calling orig again to fetch the next. */
-	if (gAegisLevel >= AEGIS_LEVEL_PARANOID && buf && buf->f_mntonname[0]) {
-		if (aegis_path_is_jailbreak_artefact(buf->f_mntonname)) {
-			return aegis_getfsent_orig(buf);
-		}
-	}
-	return r;
-}
+/* Mount enumeration hiding is handled by cloak_interpose (getfsstat/statfs);
+ * Darwin libc has no getfsent, so nothing to hook here.
+ * ------------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------------ */
 /* Installation                                                              */
@@ -269,14 +254,10 @@ void aegis_interpose_init(void)
 	if (gAegisLevel >= AEGIS_LEVEL_LITE) {
 		litehook_hook_function(stat,        aegis_stat_hook);
 		litehook_hook_function(lstat,       aegis_lstat_hook);
-		litehook_hook_function(access,      aegis_access_hook);
+		litehook_hook_function(access,     aegis_access_hook);
 		litehook_hook_function(open,        aegis_open_hook);
 		litehook_hook_function(openat,      aegis_openat_hook);
 		litehook_hook_function(faccessat,  aegis_faccessat_hook);
 		litehook_hook_function(__posix_spawn,  aegis_posix_spawn_hook);
-	}
-	/* PARANOID: also hide mount enumeration entries */
-	if (gAegisLevel >= AEGIS_LEVEL_PARANOID) {
-		if (getfsent) litehook_hook_function(getfsent, aegis_getfsent_hook);
 	}
 }

