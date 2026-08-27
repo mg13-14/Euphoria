@@ -74,7 +74,7 @@ static NSString * const EUDefaultPackageManagerKey = @"org.coolstar.SileoStore";
     static dispatch_once_t onceToken;
     static NSArray *releases;
     dispatch_once(&onceToken, ^{
-        NSURL *url = [NSURL URLWithString:@"https://api.github.com/repos/euphoria-jb/Euphoria/releases"];
+        NSURL *url = [NSURL URLWithString:@"https://api.github.com/repos/mg13-14/Euphoria/releases"];
         NSData *data = [NSData dataWithContentsOfURL:url];
         if (data) {
             NSError *error;

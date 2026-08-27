@@ -106,3 +106,15 @@ jobs:
           name: Euphoria
           path: |
             ${{ github.workspace }}/Application/Euphoria.ipa
+            ${{ github.workspace }}/Application/Euphoria.tipa
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            Application/Euphoria.ipa \
+            Application/Euphoria.tipa \
+            --title "Euphoria ${{ github.ref_name }}" \
+            --generate-notes

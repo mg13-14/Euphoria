@@ -256,6 +256,7 @@
                 8CF3E8662F72D57800931CA8 /* DarkSword.m in Sources */ = {isa = PBXBuildFile; fileRef = 8CF3E85B2F72D50200931CA8 /* DarkSword.m */; };
                 8CF3E8672F72DD9400931CA8 /* DarkSword.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CF3E8582F72D45800931CA8 /* DarkSword.framework */; };
                 8CF3E8682F72DD9400931CA8 /* DarkSword.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8CF3E8582F72D45800931CA8 /* DarkSword.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AA1C00012E7A000000000001 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA1C00012E7A000000000002 /* UIKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -598,6 +599,7 @@
                 8C56D4C82B7C102B001C03D3 /* LICENSE_Zebra.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = LICENSE_Zebra.md; sourceTree = "<group>"; };
                 8C56D4CC2B7C118B001C03D3 /* LICENSE_kfd.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = LICENSE_kfd.md; sourceTree = "<group>"; };
                 8C58E5582B7EAF8000E3ADAA /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
+		AA1C00012E7A000000000002 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
                 8C5FA8D42BDD36B6008C246F /* weightBufs.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = weightBufs.framework; sourceTree = BUILT_PRODUCTS_DIR; };
                 8C5FA8D62BDD36B6008C246F /* weightBufs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = weightBufs.h; sourceTree = "<group>"; };
                 8C5FA8E42BDD36BF008C246F /* multicast_bytecopy.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = multicast_bytecopy.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -816,6 +818,7 @@
                         isa = PBXFrameworksBuildPhase;
                         buildActionMask = 2147483647;
                         files = (
+                                AA1C00012E7A000000000001 /* UIKit.framework in Frameworks */,
                                 8C029F6B2B4E320E0071DE58 /* libz.tbd in Frameworks */,
                                 8CDD08472B4F6DD800A32B61 /* libxpf.dylib in Frameworks */,
                                 8CDD08462B4F6DD800A32B61 /* libchoma.dylib in Frameworks */,
