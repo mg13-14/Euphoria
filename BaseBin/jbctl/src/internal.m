@@ -33,6 +33,13 @@ int unmount_unsandboxed(const char *dir, int flags)
         return r;
 }
 
+static void jbctl_rootful_progress_cb(const char *line, void *ctx)
+{
+        (void)ctx;
+        printf("%s\n", line);
+        fflush(stdout);
+}
+
 bool is_protected(const char *path)
 {
         struct statfs sb;
@@ -175,11 +182,7 @@ int jbctl_handle_internal(const char *command, int argc, char* argv[])
                         if (ok) {
                                 char err[192] = { 0 };
                                 int r = rootful_fakefs_run(sub, extra,
-                                        ^(const char *line, void *ctx) {
-                                                (void)ctx;
-                                                printf("%s\n", line);
-                                                fflush(stdout);
-                                        }, NULL, err, sizeof(err));
+                                        jbctl_rootful_progress_cb, NULL, err, sizeof(err));
                                 if (r != 0 && err[0]) printf("ERROR: %s\n", err);
                                 return r;
                         }
