@@ -11,6 +11,7 @@
 #import "EUBootstrapper.h"
 #import "EUExploitManager.h"
 #import <libjailbreak/util.h>
+#import <libjailbreak/jbroot.h>
 #import <libjailbreak/trustcache.h>
 #import <libjailbreak/info.h>
 #import <choma/Fat.h>
@@ -162,7 +163,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     NSString *appBundlePath = nil;
 
     // ① 解包（.ipa → 暂存目录；.app 直接用）
-    if ([appURL.pathExtension.caseInsensitiveCompare:@"ipa"] == NSOrderedSame) {
+    if ([appURL.pathExtension caseInsensitiveCompare:@"ipa"] == NSOrderedSame) {
         NSString *unzipPath = JBROOT_PATH(@"/usr/bin/unzip");
         if (![[NSFileManager defaultManager] isExecutableFileAtPath:unzipPath]) {
             if (error) *error = fail(EUTrollEErrorCodeUnzipMissing, @"缺少 unzip（请先在包管理器中安装 unzip 包，Procursus 源提供）");
@@ -192,7 +193,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
             }
         }
     }
-    else if ([appURL.pathExtension.caseInsensitiveCompare:@"app"] == NSOrderedSame) {
+    else if ([appURL.pathExtension caseInsensitiveCompare:@"app"] == NSOrderedSame) {
         appBundlePath = appURL.path;
     }
 
@@ -231,7 +232,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
 
     // ④ 拷入 /var/jb/Applications（root）
     __block BOOL copied = NO;
-    NSString *destPath = JBROOT_PATH([NSString stringWithFormat:@"/Applications/%@", appBundlePath.lastPathComponent]);
+    NSString *destPath = JBROOT_PATH(([NSString stringWithFormat:@"/Applications/%@", appBundlePath.lastPathComponent]));
     [[EUEnvironmentManager sharedManager] runAsRoot:^{
         [[NSFileManager defaultManager] removeItemAtPath:destPath error:nil];
         copied = [[NSFileManager defaultManager] copyItemAtPath:appBundlePath toPath:destPath error:nil];
@@ -242,7 +243,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     }
 
     // ⑤ uicache 刷新图标
-    int r = exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache").fileSystemRepresentation,
+    int r = exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"),
                              "-p", destPath.fileSystemRepresentation, NULL);
     if (r != 0) {
         EUTrolleLog(@"巨魔E：uicache 返回 %d（图标可能需注销后出现）", r);
@@ -255,7 +256,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
         @"bundleID" : bundleID,
         @"path" : destPath,
         @"cdhash" : cdhashHex,
-        @"installedAt" : [[NSDate date] timeIntervalSince1970],
+        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
     }];
     [self saveEntries:entries];
 
@@ -295,7 +296,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     [entries filterUsingPredicate:[NSPredicate predicateWithFormat:@"bundleID != %@", bundleID]];
     [self saveEntries:entries];
 
-    exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache").fileSystemRepresentation, "-u", [target[@"path"] stringByDeletingLastPathComponent].fileSystemRepresentation, NULL);
+    exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"), "-u", [target[@"path"] stringByDeletingLastPathComponent].fileSystemRepresentation, NULL);
     return removed;
 }
 
@@ -622,7 +623,7 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
         @"cdhash" : cdhashHex,
         @"role" : @"body",           // 引擎B 装出的首个应用=巨魔E 本体
         @"engine" : @"B",            // 来源标记（A/B 互不冲突）
-        @"installedAt" : [[NSDate date] timeIntervalSince1970],
+        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
     }];
     // 保存此时进程为 root，直接落盘（无 runAsRoot 依赖——那是越狱态通道）
     NSString *registryDir = [[EUTrollE registryPath] stringByDeletingLastPathComponent];
@@ -734,7 +735,7 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
         @"role" : @"guest",           // 容器内访客应用
         @"engine" : @"C",
         @"container" : uuid,          // 启动引用：euphoria-trolle://launch?id=<uuid>
-        @"installedAt" : [[NSDate date] timeIntervalSince1970],
+        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
     }];
     [self saveEntries:entries];
 

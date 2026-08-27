@@ -89,7 +89,7 @@ static NSString *eufs_fullname_of_bsd(const char *bsd)
         if (!bsd || !bsd[0]) return nil;
         CFMutableDictionaryRef matching = IOServiceMatching("AppleAPFSVolume");
         io_iterator_t iter = 0;
-        if (IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iter) != KERN_SUCCESS) return nil;
+        if (IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter) != KERN_SUCCESS) return nil;
         NSString *result = nil;
         io_object_t service;
         while (!result && (service = IOIteratorNext(iter)) != 0) {
