@@ -17,7 +17,7 @@
 #import <choma/Fat.h>
 #import <choma/MachO.h>
 #import <choma/CSBlob.h>
-#import <UIKit/UIKit.h>
+#import <objc/message.h>
 #import <dlfcn.h>
 #import <sys/sysctl.h>
 #import <string.h>
@@ -26,6 +26,18 @@
 NSString *const EUTrollEErrorDomain = @"EUTrollEErrorDomain";
 
 #define EUTrolleLog(fmt, ...) [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:fmt, ##__VA_ARGS__] debug:NO]
+
+// This file is also compiled into the BaseBin/euphoria CLI, which links no
+// UIKit — resolve UIApplication at runtime instead of at link time.
+static void EUTrollEOpenURL(NSURL *url)
+{
+    Class uiApplicationClass = NSClassFromString(@"UIApplication");
+    if (!uiApplicationClass) return;
+    id app = ((id (*)(id, SEL))objc_msgSend)((id)uiApplicationClass, sel_registerName("sharedApplication"));
+    if (!app) return;
+    ((void (*)(id, SEL, NSURL *, NSDictionary *, id))objc_msgSend)(
+        app, sel_registerName("openURL:options:completionHandler:"), url, @{}, nil);
+}
 
 #pragma mark - ChOma C 桥接（CDHash 计算）
 
@@ -510,7 +522,7 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
                                   [NSCharacterSet URLQueryAllowedCharacterSet]]];
             NSURL *url = [NSURL URLWithString:handoff];
             if (url) {
-                [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+                EUTrollEOpenURL(url);
                 EUTrolleLog(@"巨魔E：本体在位，已移交安装 → %@", appURL.lastPathComponent);
                 if (error) *error = nil;
                 return YES;
