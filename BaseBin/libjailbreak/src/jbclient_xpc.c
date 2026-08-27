@@ -2,6 +2,7 @@
 #include "jbclient_mach.h"
 #include "jbserver.h"
 #include <dispatch/dispatch.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <pthread.h>
