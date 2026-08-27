@@ -1,0 +1,32 @@
+#!/bin/sh
+# 巨魔E 安装器 postinst —— B24 §3 分发架构：仅放文件，不跑安装动作
+# （无 KRW 时安装动作必然失败；真正的"装本体"由用户点开安装器触发，见 EUTrollE 门面）
+
+set -e
+
+INSTALLER_PREFIX="/var/jb"
+
+# 安装器资源占位（巨魔E 本体 .app 由 CI 从 Application/EUTrollE target 产出后落入）
+# 本脚本只确保目录结构与权限，不做任何依赖 root/KRW 的动作。
+
+mkdir -p "${INSTALLER_PREFIX}/var/db/euphoria"
+chown -R 0:0 "${DEBIAN_PREFIX}${INSTALLER_PREFIX}/var/db/euphoria" 2>/dev/null || \
+chown -R root:root "${DEBIAN_PREFIX}${INSTALLER_PREFIX}/var/db/euphoria" 2>/dev/null || true
+
+# 致谢（用户指令 2026-08-27 11:38：所有自研项目致谢含 mg13-14 与所用大模型）
+if [ ! -f "${DEBIAN_PREFIX}${INSTALLER_PREFIX}/var/db/euphoria/CREDITS" ]; then
+cat > "${DEBIAN_PREFIX}${INSTALLER_PREFIX}/var/db/euphoria/CREDITS" <<'CREDITS_EOF'
+Euphoria / TrollE (巨魔E) Credits
+
+Special Thanks:
+  mg13-14
+
+AI Assistance:
+  清言 AgentMore（并行搜索员A/B/C、搜索规划师、报告汇总员）
+  GLM 大模型（Z.ai）
+CREDITS_EOF
+fi
+
+echo "TrollE installer: files staged. Open the installer app to install 巨魔E."
+
+exit 0

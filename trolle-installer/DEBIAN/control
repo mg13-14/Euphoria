@@ -1,0 +1,11 @@
+Package: dev.euphoria.trolle-installer
+Name: TrollE (巨魔E) Installer
+Author: Euphoria Project
+Maintainer: Euphoria Project
+Architecture: iphoneos-arm64
+Version: 0.9.1
+Depends: euphoria-basebin-link
+Section: System
+Priority: optional
+Homepage: https://github.com/euphoria-jb/Euphoria
+Description: 巨魔E（TrollStore E）安装器——自研永久签名安装器本体。越狱态引擎开箱即用（信任缓存秒装）；免越狱引擎随版本接入。装出本体脱狱独立常驻，不依赖 Euphoria App。

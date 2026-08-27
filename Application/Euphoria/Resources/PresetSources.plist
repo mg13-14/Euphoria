@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- R14（SSOT v2.13 终版：七源架构，roothide 对齐）
+     写入 sources.list.d 的六源中，前五条为此处清单；第六槽=EU 自家源
+     （占 roothide 官方源位，域名随 R17 定案后单点即加，零代码变更）。
+     第七源=bootstrap 分发源（GitHub releases 自持，非 apt 源，不落盘）。
+     参照系逐字对齐 roothide Dopamine 1.x default.sources（B20 实证 :334-364）：
+     无 ElleKit（其位置=roothide 官方源/EU 源）、无 apt.procurs.us（被 roothide 镜像替代）。
+     {BOOTSTRAP} 占位符由 writePresetSources 以实际 bootstrap 代数（1800/1900）替换
+     ——已实测：roothide 镜像 suite=iphoneos-arm64e/1800（代数），非系统大版本。
+     zh_CN 镜像（iosjb.top）与 Zebra 容器写法为决策点/接线项，见交付文档§四。 -->
+<array>
+	<dict>
+		<key>Key</key>
+		<string>yourepo</string>
+		<key>URL</key>
+		<string>https://yourepo.com/</string>
+		<key>Suites</key>
+		<string>./</string>
+		<key>Components</key>
+		<string></string>
+		<key>Fixed</key>
+		<true/>
+	</dict>
+	<dict>
+		<key>Key</key>
+		<string>chariz</string>
+		<key>URL</key>
+		<string>https://repo.chariz.com/</string>
+		<key>Suites</key>
+		<string>./</string>
+		<key>Components</key>
+		<string></string>
+		<key>Fixed</key>
+		<true/>
+	</dict>
+	<dict>
+		<key>Key</key>
+		<string>havoc</string>
+		<key>URL</key>
+		<string>https://havoc.app/</string>
+		<key>Suites</key>
+		<string>./</string>
+		<key>Components</key>
+		<string></string>
+		<key>Fixed</key>
+		<true/>
+	</dict>
+	<dict>
+		<key>Key</key>
+		<string>bigboss</string>
+		<key>URL</key>
+		<string>http://apt.thebigboss.org/repofiles/cydia/</string>
+		<key>Suites</key>
+		<string>stable</string>
+		<key>Components</key>
+		<string>main</string>
+		<key>Fixed</key>
+		<true/>
+	</dict>
+	<dict>
+		<key>Key</key>
+		<string>roothideproc</string>
+		<key>URL</key>
+		<string>https://roothide.github.io/procursus</string>
+		<key>Suites</key>
+		<string>iphoneos-arm64e/{BOOTSTRAP}</string>
+		<key>Components</key>
+		<string>main</string>
+		<key>Fixed</key>
+		<true/>
+	</dict>
+</array>
+</plist>
