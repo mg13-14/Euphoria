@@ -39,7 +39,7 @@ static bool aegis_caller_is_platform(audit_token_t *callerToken)
 	return (csflags & CS_PLATFORM_BINARY);
 }
 
-static int aegis_get_policy(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int aegis_server_get_policy(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
 	/* out args: policy(dict), mountActive(bool), mountPoint(string), error(string) */
 	if (a1) *(xpc_object_t *)a1 = aegis_policy_serialize(&gAegisPolicy);
@@ -49,7 +49,7 @@ static int aegis_get_policy(void *a1, void *a2, void *a3, void *a4, void *a5, vo
 	return 0;
 }
 
-static int aegis_enable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int aegis_server_enable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
 	audit_token_t *callerToken = (audit_token_t *)a1;
 	if (!aegis_caller_is_platform(callerToken)) return -2;
@@ -57,7 +57,7 @@ static int aegis_enable(void *a1, void *a2, void *a3, void *a4, void *a5, void *
 	return 0;
 }
 
-static int aegis_disable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int aegis_server_disable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
 	audit_token_t *callerToken = (audit_token_t *)a1;
 	if (!aegis_caller_is_platform(callerToken)) return -2;
@@ -65,7 +65,7 @@ static int aegis_disable(void *a1, void *a2, void *a3, void *a4, void *a5, void 
 	return 0;
 }
 
-static int aegis_set_default_level(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int aegis_server_set_default_level(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
 	audit_token_t *callerToken = (audit_token_t *)a1;
 	if (!aegis_caller_is_platform(callerToken)) return -2;
@@ -76,7 +76,7 @@ static int aegis_set_default_level(void *a1, void *a2, void *a3, void *a4, void 
 	return 0;
 }
 
-static int aegis_add_app(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int aegis_server_add_app(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
 	audit_token_t *callerToken = (audit_token_t *)a1;
 	if (!aegis_caller_is_platform(callerToken)) return -2;
@@ -98,7 +98,7 @@ static int aegis_add_app(void *a1, void *a2, void *a3, void *a4, void *a5, void 
 	return 0;
 }
 
-static int aegis_remove_app(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int aegis_server_remove_app(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
 	audit_token_t *callerToken = (audit_token_t *)a1;
 	if (!aegis_caller_is_platform(callerToken)) return -2;
@@ -121,7 +121,7 @@ static int aegis_remove_app(void *a1, void *a2, void *a3, void *a4, void *a5, vo
 	return 0; /* not found is not an error */
 }
 
-static int aegis_clear_apps(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int aegis_server_clear_apps(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
 	audit_token_t *callerToken = (audit_token_t *)a1;
 	if (!aegis_caller_is_platform(callerToken)) return -2;
@@ -153,10 +153,10 @@ static int aegis_mount_report(void *a1, void *a2, void *a3, void *a4, void *a5, 
 
 struct jbserver_domain gAegisDomain = {
 	.permissionHandler = NULL, // GET_POLICY systemwide; mutations check per-action
-	.actions = (struct jbserver_action[]){
+	.actions = {
 		// JBS_AEGIS_GET_POLICY
 		{
-			.handler = aegis_get_policy,
+			.handler = aegis_server_get_policy,
 			.args = (jbserver_arg[]){
 				{ .name = "policy",     .type = JBS_TYPE_DICTIONARY, .out = true },
 				{ .name = "mountActive", .type = JBS_TYPE_BOOL,      .out = true },
@@ -167,7 +167,7 @@ struct jbserver_domain gAegisDomain = {
 		},
 		// JBS_AEGIS_ENABLE
 		{
-			.handler = aegis_enable,
+			.handler = aegis_server_enable,
 			.args = (jbserver_arg[]){
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ 0 },
@@ -175,7 +175,7 @@ struct jbserver_domain gAegisDomain = {
 		},
 		// JBS_AEGIS_DISABLE
 		{
-			.handler = aegis_disable,
+			.handler = aegis_server_disable,
 			.args = (jbserver_arg[]){
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ 0 },
@@ -183,7 +183,7 @@ struct jbserver_domain gAegisDomain = {
 		},
 		// JBS_AEGIS_SET_DEFAULT_LEVEL
 		{
-			.handler = aegis_set_default_level,
+			.handler = aegis_server_set_default_level,
 			.args = (jbserver_arg[]){
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "level",        .type = JBS_TYPE_UINT64,        .out = false },
@@ -192,7 +192,7 @@ struct jbserver_domain gAegisDomain = {
 		},
 		// JBS_AEGIS_ADD_APP
 		{
-			.handler = aegis_add_app,
+			.handler = aegis_server_add_app,
 			.args = (jbserver_arg[]){
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "bundleId",     .type = JBS_TYPE_STRING,       .out = false },
@@ -202,7 +202,7 @@ struct jbserver_domain gAegisDomain = {
 		},
 		// JBS_AEGIS_REMOVE_APP
 		{
-			.handler = aegis_remove_app,
+			.handler = aegis_server_remove_app,
 			.args = (jbserver_arg[]){
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "bundleId",     .type = JBS_TYPE_STRING,       .out = false },
@@ -211,7 +211,7 @@ struct jbserver_domain gAegisDomain = {
 		},
 		// JBS_AEGIS_CLEAR_APPS
 		{
-			.handler = aegis_clear_apps,
+			.handler = aegis_server_clear_apps,
 			.args = (jbserver_arg[]){
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ 0 },
