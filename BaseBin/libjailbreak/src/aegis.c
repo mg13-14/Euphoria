@@ -7,6 +7,14 @@
 #include <string.h>
 #include <stdlib.h>
 
+// 构建修复：string_has_prefix 在树中无定义，此处补最小实现
+static bool string_has_prefix(const char *str, const char *prefix)
+{
+        if (!str || !prefix) return false;
+        size_t plen = strlen(prefix);
+        return strncmp(str, prefix, plen) == 0;
+}
+
 xpc_object_t aegis_policy_serialize(const aegis_policy_t *policy)
 {
         xpc_object_t xdict = xpc_dictionary_create_empty();
