@@ -2,8 +2,9 @@ TARGET = cloakd
 
 CC = clang
 
-CFLAGS = -I../.include -I./src -isysroot $(shell xcrun --sdk iphoneos --show-sdk-path) -arch arm64 -arch arm64e -miphoneos-version-min=15.0 -Wno-deprecated-declarations -D BUILD_STANDALONE=$(BUILD_STANDALONE) -O2
-LDFLAGS = -lbsm -L../.build -ljailbreak -framework CoreFoundation -framework IOKit -framework CoreServices
+# 构建修复：util.c 包含 <archive.h>，与 libjailbreak 对齐补 libarchive 头文件路径
+CFLAGS = -I../.include -I./src -I$(shell brew --prefix)/opt/libarchive/include -isysroot $(shell xcrun --sdk iphoneos --show-sdk-path) -arch arm64 -arch arm64e -miphoneos-version-min=15.0 -Wno-deprecated-declarations -D BUILD_STANDALONE=$(BUILD_STANDALONE) -O2
+LDFLAGS = -lbsm -larchive -L../.build -ljailbreak -framework CoreFoundation -framework IOKit -framework CoreServices
 
 sign: $(TARGET)
 	@ldid -Cadhoc -Sentitlements.plist $<
