@@ -2,7 +2,7 @@
 //  EUTrollE.h
 //  Euphoria
 //
-//  巨魔E（TrollStore E）核心 —— R19 / B23 Tier A（V0.9.0 越狱态）
+//  巨魔E（TrollStore E）核心 —— R19 / B23 Tier A（V0.9.1 越狱态）
 //  Created by 并行搜索员B on 27.08.2026.
 //
 //  机制（B23 信任缓存路线）：
@@ -41,7 +41,7 @@ typedef NS_ENUM(NSInteger, EUTrollEErrorCode) {
 typedef NS_ENUM(NSInteger, EUTrollEInstallMode) {
     EUTrollEInstallModeAuto = 0,            ///< 按越狱态自动选择（越狱→A，未越狱→B）
     EUTrollEInstallModeJailbroken = 1,      ///< 引擎A：越狱态信任缓存秒装（已实现）
-    EUTrollEInstallModeJailbreakFree = 2,   ///< 引擎B：免越狱一次性会话（kfd+dmaFail，V0.9.1 目标）
+    EUTrollEInstallModeJailbreakFree = 2,   ///< 引擎B：免越狱一次性会话（kfd+dmaFail，V0.9.2 目标）
     EUTrollEInstallModeContainerized = 3,   ///< 引擎C：免越狱容器模式（L1 基线，B26；无漏洞全版本可用）
 };
 
@@ -70,7 +70,11 @@ typedef NS_ENUM(NSInteger, EUTrollEInstallMode) {
 ///       re-arm 依赖正常签名渠道保活=B26 L2；L1 容器兜底）；
 ///   ③ PC 辅助子模式：16.7b/RC/17.0 设备端 kfd 装法死（arm64e 16.6.2+）
 ///      → 该档免越狱安装走 PC 备份注入（TrollRestore 先例，原版巨魔同款路径）。
-/// → 越狱态（Engine A）：越狱链可及域（15.0~18.7.6 + 26.0~26.3.x，R29 快胜线已拉宽），
+/// → 越狱态（Engine A）：越狱链可及域（实证 15.0~16.5.1；16.6.1+ 实验性——R34 矩阵
+///   诚实化已收回 R29 的 18.7.6/26.3.x 纸面拉宽；A12/A13 的 16.6.1+ 卡点=momentarius
+///   PPL 假设级未实测，18.7.2+ 内核段 CVE-2025-43520 已被 Apple 修补（NVD 铁证，
+///   B 2026-08-29 核对；8kSec 的"≥18.7.7 或 ≥26.3"是 DarkSword 全链 fleet 基线，
+///   非单 CVE 修复点——勿混用），
 ///   "越狱到哪巨魔E 跟到哪"，**零辅助安装**（用户 11:50 定案：越狱态一律安装器直装，
 ///   不需要 PC/辅助渠道——信任缓存注入链已闭环）。
 /// 两态并集对外呈现；UI 按"永久/会话"双态徽标（会话态带重激活按钮，不标永久）；
@@ -89,7 +93,7 @@ typedef NS_ENUM(NSInteger, EUTrollEInstallMode) {
 
 /// 永久安装一个应用（.ipa 或已解包 .app 目录）。
 /// 三引擎门面（C23+B25+B26）：越狱态走引擎A（信任缓存秒装，零辅助）；未越狱走
-/// 引擎B（免越狱一次性会话：CT 域设备端 kfd 装本体+helper，V0.9.1 实机验证）
+/// 引擎B（免越狱一次性会话：CT 域设备端 kfd 装本体+helper，V0.9.2 实机验证）
 /// 或引擎C（容器模式 L1 基线：全版本域，宿主代签，JIT-Less）。mode=Auto 按越狱态选择。
 - (BOOL)installApplicationAtURL:(NSURL *)appURL
                            mode:(EUTrollEInstallMode)mode

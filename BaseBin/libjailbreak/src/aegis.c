@@ -6,14 +6,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <stdbool.h>
-
-static bool string_has_prefix(const char *str, const char *prefix)
-{
-        if (!str || !prefix) return false;
-        size_t len = strlen(prefix);
-        return strncmp(str, prefix, len) == 0;
-}
 
 xpc_object_t aegis_policy_serialize(const aegis_policy_t *policy)
 {

@@ -6,6 +6,7 @@
 //
 
 #import "EUThemeManager.h"
+#import "EUPreferenceManager.h"
 
 @implementation EUThemeManager
 
@@ -67,8 +68,10 @@
 
 - (EUTheme*)enabledTheme
 {
-    // Theming has been removed, always use the default theme (Dopamine style)
-    return self.themes.firstObject;
+    id value = [[EUPreferenceManager sharedManager] preferenceValueForKey:@"theme"];
+    if (!value)
+        return self.themes.firstObject;
+    return [self getThemeForKey:value] ?: self.themes.firstObject;
 }
 
 

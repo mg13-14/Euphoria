@@ -1,0 +1,25 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Origin: Euphoria
+Label: Euphoria Official Source
+Suite: ./
+Version: 1.0
+Codename: ./
+Architectures: iphoneos-arm64
+Components: main
+Description: Euphoria EU 官方源（Flat 结构）
+Date: Thu, 27 Aug 2026 16:30:09 UTC
+MD5Sum:
+ df574950911a3f728d2dfb5f5de152d4 e41527d0f3bda787bab33d4a943b582790837626831bddff365230bbea14f16b 768 Packages
+ f12b81fc75c3eea915075cb30a7eee62 79cf0de2143b42cb67315e7fa289c93ce47ee69bb4e15459ef9d4abd5dcdc5f9 600 Packages.gz
+SHA256:
+ df574950911a3f728d2dfb5f5de152d4 e41527d0f3bda787bab33d4a943b582790837626831bddff365230bbea14f16b 768 Packages
+ f12b81fc75c3eea915075cb30a7eee62 79cf0de2143b42cb67315e7fa289c93ce47ee69bb4e15459ef9d4abd5dcdc5f9 600 Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iIsEARYKADMWIQR7DGmZWXMUtS3kZe83J7pzFAqThQUCapBmIBUcdGVzdEBldXBo
+b3JpYS1qYi5kZXYACgkQNye6cxQKk4Vx2wD9G+YBepGLnc+ANjCLVGwyof/xj026
+JFINNtTt99AhKEQA/RrdA9T2MdgEQyBjgqwyE3VMoEjSU5IFQ6h8I9KGKucB
+=9AZ4
+-----END PGP SIGNATURE-----

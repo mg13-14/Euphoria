@@ -212,7 +212,7 @@ int eufs_probe_layout(eufs_probe_t *out)
         NSString *candidate = nil;
         NSString *method = nil;
 
-        NSString *parentBsd = eufs_parent_of_volume(systemVolume);
+        NSString *parentBsd = eufs_parent_of_volume(systemVolume.UTF8String);
         if (parentBsd && eufs_device_exists(parentBsd)) {
                 candidate = parentBsd;
                 method = @"iokit:parent-walk";

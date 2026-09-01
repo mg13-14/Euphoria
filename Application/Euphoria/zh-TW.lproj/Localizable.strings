@@ -1,4 +1,4 @@
-"Credits_Made_By" = "由 opa334 開發，ElleKit 由 évelyne 開發";
+"Credits_Made_By" = "Euphoria 團隊出品 · 特別致謝 mg13-14 與 GLM-4-Plus/Z.ai";
 
 // Log
 "Status_Title_Jailbreaking" = "正在越獄";
@@ -129,3 +129,9 @@
 "Status_Title_Select_Package_Managers" = "選擇套件管理器";
 "Select_Package_Managers_Install_Message" = "如果不確定該選哪一個，請選擇 Sileo";
 "Continue" = "繼續";
+// R36 hide jailbreak (rootless)
+"Hide_Jailbreak" = "Hide Jailbreak";
+"Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+// R37 roothide mode
+"Roothide_Mode" = "Roothide Mode";
+"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";

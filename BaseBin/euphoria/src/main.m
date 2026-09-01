@@ -409,6 +409,14 @@ void activate_rootful_and_cloak(void)
 
         bool supported = rootful_supported_configuration();
         bool rootfulToggle = jbclient_jbsettings_get_bool("rootfulUserEnabled");
+        // R37（用户 2026-08-29 00:11 定案）：roothide 是 rootful 的前置——
+        // "选了 rootful 自动选 roothide；关了 roothide 就不能开 rootful"。
+        // 服务端 jbsettings 写入侧已兜底联动，这里对存量状态再校验一次。
+        bool roothideToggle = jbclient_jbsettings_get_bool("roothideUserEnabled");
+        if (rootfulToggle && !roothideToggle) {
+                printf("Rootful: roothide toggle is off -> rootful force-disabled (user rule 2026-08-29)\n");
+                rootfulToggle = false;
+        }
         bool rootfulWanted = supported && rootfulToggle
                 && (access(JBROOT_PATH("/basebin/.rootful_disabled"), F_OK) != 0);
         // Hiding (the "roothide" leg) is wanted in BOTH modes and on every
@@ -442,7 +450,31 @@ void activate_rootful_and_cloak(void)
                 if (cloak_enable() == 0) {
                         // cloakd (loaded through the basebin LaunchDaemons directory)
                         // will bring up the cover mount within seconds and report back
-                        printf("Cloak: enabled\n");
+                        // R38（用户 2026-08-29 11:41 定案）：屏蔽软件双形态——
+                        //   深档（rootful 态）：stealthLevel=3+三 hide 全开。
+                        //     rootful 挂载面更大（fakefs/overlay 六目录），检测面也更大，
+                        //     全 hide+激进 stealth（getfsstat 白名单外的挂载全隐）。
+                        //   基础档（普通 roothide）：stealthLevel=1+三 hide 全开。
+                        //     jbroot/bind 隐藏足够，挂载白名单宽松（系统卷正常露出）。
+                        // 形态由 rootfulWanted 决定（rootful 捆绑 roothide，R37 联动），
+                        // 每次越狱重放（幂等），用户手动 set_options 仍可覆盖。
+                        cloak_policy_t cloakPolicy = { 0 };
+                        cloak_get_policy(&cloakPolicy);
+                        cloakPolicy.hideMounts      = true;
+                        cloakPolicy.hideCredentials = true;
+                        cloakPolicy.hideTrustcache  = true;
+                        cloakPolicy.stealthLevel    = rootfulWanted ? 3 : 1;
+                        // R40（用户 2026-08-29 17:00）：黑名单制默认开——拉黑的 app
+                        // 检测不到越狱；名单外（文件管理器等越狱生态工具）正常可见。
+                        cloakPolicy.blacklistMode   = true;
+                        if (cloak_set_options(&cloakPolicy) == 0) {
+                                printf("Cloak: enabled (%s form, stealth %llu)\n",
+                                        rootfulWanted ? "rootful/deep" : "roothide/basic",
+                                        (unsigned long long)cloakPolicy.stealthLevel);
+                        }
+                        else {
+                                printf("Cloak: enabled (form set failed, defaults)\n");
+                        }
                 }
                 else {
                         printf("Cloak: enable failed\n");
@@ -500,9 +532,12 @@ void install_euphoria_from_tarball(const char *tarballPath, const char *bootstra
 
 void activate_euphoria(void)
 {
+        // R34：事务式越狱标记——流程起点清标记（半程=未越狱，可幂等重跑）
+        unlink(JBROOT_PATH("/basebin/.bootstrap_complete"));
+
         activate_environment(true, false);
         activate_basebin(JBROOT_PATH(@"/basebin"));
-        
+
         // Now that fakelib is up, we want to make systemhook inject into any binary we spawn
         setenv("DYLD_INSERT_LIBRARIES", "/usr/lib/systemhook.dylib", 1);
 
@@ -510,6 +545,18 @@ void activate_euphoria(void)
         load_var_jb_daemons();
 
         activate_rootful_and_cloak();
+
+        // R34：全流程（bootstrap→守护进程→rootful/cloak）走完才打完成标记；
+        // launchdhook 的 is_jailbroken 判定要求 .version + .bootstrap_complete 双证。
+        // 卡死/半途退出的会话不会再显示"已越狱"假状态（用户 00:19 实锤修复）。
+        {
+                NSString *marker = @(JBROOT_PATH("/basebin/.bootstrap_complete"));
+                if (![[NSFileManager defaultManager] createFileAtPath:marker
+                                                             contents:[@"1" dataUsingEncoding:NSUTF8StringEncoding]
+                                                           attributes:nil]) {
+                        printf("WARNING: failed to write .bootstrap_complete marker\n");
+                }
+        }
 
         printf("Euphoria activated, see you on the other side!\n");
 }

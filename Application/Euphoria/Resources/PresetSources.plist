@@ -1,75 +1,192 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<!-- R14（SSOT v2.13 终版：七源架构，roothide 对齐）
-     写入 sources.list.d 的六源中，前五条为此处清单；第六槽=EU 自家源
-     （占 roothide 官方源位，域名随 R17 定案后单点即加，零代码变更）。
-     第七源=bootstrap 分发源（GitHub releases 自持，非 apt 源，不落盘）。
-     参照系逐字对齐 roothide Dopamine 1.x default.sources（B20 实证 :334-364）：
-     无 ElleKit（其位置=roothide 官方源/EU 源）、无 apt.procurs.us（被 roothide 镜像替代）。
-     {BOOTSTRAP} 占位符由 writePresetSources 以实际 bootstrap 代数（1800/1900）替换
-     ——已实测：roothide 镜像 suite=iphoneos-arm64e/1800（代数），非系统大版本。
-     zh_CN 镜像（iosjb.top）与 Zebra 容器写法为决策点/接线项，见交付文档§四。 -->
-<array>
-	<dict>
-		<key>Key</key>
-		<string>yourepo</string>
-		<key>URL</key>
-		<string>https://yourepo.com/</string>
-		<key>Suites</key>
-		<string>./</string>
-		<key>Components</key>
-		<string></string>
-		<key>Fixed</key>
-		<true/>
-	</dict>
-	<dict>
-		<key>Key</key>
-		<string>chariz</string>
-		<key>URL</key>
-		<string>https://repo.chariz.com/</string>
-		<key>Suites</key>
-		<string>./</string>
-		<key>Components</key>
-		<string></string>
-		<key>Fixed</key>
-		<true/>
-	</dict>
-	<dict>
-		<key>Key</key>
-		<string>havoc</string>
-		<key>URL</key>
-		<string>https://havoc.app/</string>
-		<key>Suites</key>
-		<string>./</string>
-		<key>Components</key>
-		<string></string>
-		<key>Fixed</key>
-		<true/>
-	</dict>
-	<dict>
-		<key>Key</key>
-		<string>bigboss</string>
-		<key>URL</key>
-		<string>http://apt.thebigboss.org/repofiles/cydia/</string>
-		<key>Suites</key>
-		<string>stable</string>
-		<key>Components</key>
-		<string>main</string>
-		<key>Fixed</key>
-		<true/>
-	</dict>
-	<dict>
-		<key>Key</key>
-		<string>roothideproc</string>
-		<key>URL</key>
-		<string>https://roothide.github.io/procursus</string>
-		<key>Suites</key>
-		<string>iphoneos-arm64e/{BOOTSTRAP}</string>
-		<key>Components</key>
-		<string>main</string>
-		<key>Fixed</key>
-		<true/>
-	</dict>
-</array>
+<!-- R14 三模式源架构（用户 08-28 10:17/10:24 裁定 + 汇总员 10:26 派发重构，C 落码）
+     模式选择（writePresetSources 按 rootfulUserEnabled 本地偏好分支）：
+       · Mode-Roothide（默认，rootfulUserEnabled=false）＝ roothide 参照系六源
+         （B20 §1 实证 roothide Dopamine 1.x default.sources :334-364 逐字对齐）
+         + EU 源（roothide 转换形态占位）
+       · Mode-Rootless（rootfulUserEnabled=true 时复用本清单——用户定案
+         "Rootful 则是 rootless 的越狱源（包括我们自己的）"）
+         ＝ 原版 Dopamine 五源（Chariz/Havoc/BigBoss/ElleKit/Procursus）
+         + EU 源占位。纯 rootless（无 roothide）模式如后续启用，同用本清单。
+     活性验证（C 2026-08-28 10:30 Release 级实测，全员 200）：
+       chariz=repo.chariz.com（2026-08-27 更新）· havoc=havoc.app（同日）
+       · bigboss=apt.thebigboss.org/repofiles/cydia（dists/stable）
+       · ellekit=ellekit.space（扁平型：根 Release+根 Packages；2026-08-10 更新；
+         旧地址 r0xym0x.github.io 已死勿用——B 实测）
+       · procursus=apt.procurs.us（dists 型，suite=代数：1800/1900/2000/3000 全活，
+         2026-07-27 更新；本树 bootstrap 代数由 {BOOTSTRAP} 占位符运行时替换）
+       · roothide 官方=roothide.github.io（根 Release 200）
+       · roothide 镜像=roothide.github.io/procursus（suite=iphoneos-arm64e/{BOOTSTRAP}
+         带代数路径才活——裸 iphoneos-arm64e/ 是 404，A 的"死链"结论系探活路径错误）
+     EU 源槽（eu / eu-roothide）：URL 留空=占位（writePresetSources 跳过空 URL 条目），
+     R17 域名定案后单点填入即激活，零代码变更。eu-repo 实体已建（A：dpkg-scanpackages
+     索引+ed25519 签名链端到端验通）；roothide 形态=服务端 Patcher 转换（B20 §2）。
+     {BOOTSTRAP}=EUBootstrapper bootstrapVersion（与本次解包 tar 同源，永不漂移）。
+     zh_CN 镜像（iosjb.top）与 Zebra 容器写法为后续决策点，见 B20 交付文档§四。 -->
+<dict>
+        <key>Mode-Rootless</key>
+        <array>
+                <dict>
+                        <key>Key</key>
+                        <string>chariz</string>
+                        <key>URL</key>
+                        <string>https://repo.chariz.com/</string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>havoc</string>
+                        <key>URL</key>
+                        <string>https://havoc.app/</string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>bigboss</string>
+                        <key>URL</key>
+                        <string>http://apt.thebigboss.org/repofiles/cydia/</string>
+                        <key>Suites</key>
+                        <string>stable</string>
+                        <key>Components</key>
+                        <string>main</string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>ellekit</string>
+                        <key>URL</key>
+                        <string>https://ellekit.space/</string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>procursus</string>
+                        <key>URL</key>
+                        <string>https://apt.procurs.us/</string>
+                        <key>Suites</key>
+                        <string>1800</string>
+                        <key>Components</key>
+                        <string>main</string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>eu</string>
+                        <key>URL</key>
+                        <string></string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+        </array>
+        <key>Mode-Roothide</key>
+        <array>
+                <dict>
+                        <key>Key</key>
+                        <string>chariz</string>
+                        <key>URL</key>
+                        <string>https://repo.chariz.com/</string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>yourepo</string>
+                        <key>URL</key>
+                        <string>https://yourepo.com/</string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>havoc</string>
+                        <key>URL</key>
+                        <string>https://havoc.app/</string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>bigboss</string>
+                        <key>URL</key>
+                        <string>http://apt.thebigboss.org/repofiles/cydia/</string>
+                        <key>Suites</key>
+                        <string>stable</string>
+                        <key>Components</key>
+                        <string>main</string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>roothide</string>
+                        <key>URL</key>
+                        <string>https://roothide.github.io/</string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>roothideproc</string>
+                        <key>URL</key>
+                        <string>https://roothide.github.io/procursus</string>
+                        <key>Suites</key>
+                        <string>iphoneos-arm64e/{BOOTSTRAP}</string>
+                        <key>Components</key>
+                        <string>main</string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+                <dict>
+                        <key>Key</key>
+                        <string>eu-roothide</string>
+                        <key>URL</key>
+                        <string></string>
+                        <key>Suites</key>
+                        <string>./</string>
+                        <key>Components</key>
+                        <string></string>
+                        <key>Fixed</key>
+                        <true/>
+                </dict>
+        </array>
+</dict>
 </plist>

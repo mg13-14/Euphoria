@@ -131,7 +131,7 @@ static int aegis_server_clear_apps(void *a1, void *a2, void *a3, void *a4, void 
 	return 0;
 }
 
-static int aegis_mount_report(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int aegis_server_mount_report(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
 	audit_token_t *callerToken = (audit_token_t *)a1;
 	if (!aegis_caller_is_platform(callerToken)) return -2;
@@ -153,7 +153,7 @@ static int aegis_mount_report(void *a1, void *a2, void *a3, void *a4, void *a5, 
 
 struct jbserver_domain gAegisDomain = {
 	.permissionHandler = NULL, // GET_POLICY systemwide; mutations check per-action
-	.actions = {
+	.actions = (struct jbserver_action[]){
 		// JBS_AEGIS_GET_POLICY
 		{
 			.handler = aegis_server_get_policy,
@@ -219,7 +219,7 @@ struct jbserver_domain gAegisDomain = {
 		},
 		// JBS_AEGIS_MOUNT_REPORT
 		{
-			.handler = aegis_mount_report,
+			.handler = aegis_server_mount_report,
 			.args = (jbserver_arg[]){
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "mountPoint",   .type = JBS_TYPE_STRING,       .out = false },

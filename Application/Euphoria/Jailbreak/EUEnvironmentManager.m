@@ -247,21 +247,32 @@ extern char **environ;
     size_t cpuFamilySize = sizeof(cpuFamily);
     sysctlbyname("hw.cpufamily", &cpuFamily, &cpuFamilySize, NULL, 0);
     
+    // R39 用户实机靶场（2026-08-29 11:48 报备）：A13@18.1.1 / A15@15.6.1 / A15@26.5.2 /
+    // A17 Pro@17.6.1——覆盖 A12/A13 线（A13 实验性段）、A14~A17 线持久化档甜点区外沿
+    // （A17 Pro 17.6.1 在 17.4+ 断链区=L1 会话档测试位）、26.x 线（A15 26.5.2 超 43520
+    // 修复点 26.1=无公开链，攻面评审参考位）。实测回归按此四台排。
     if ([self isArm64e]) {
         if (cpuFamily == CPUFAMILY_ARM_VORTEX_TEMPEST || cpuFamily == CPUFAMILY_ARM_LIGHTNING_THUNDER) {
-            // R29 快胜线（B 11:55 闸门拉宽）：DarkSword 修复点=18.7.7/26.4（A 实锤），
-            // 故 18.7.2~18.7.6 与 26.1~26.3.x 零武器化直扩（实机回归待 A 批次）
-            return @"iOS 15.0 - 18.7.6, 26.0 - 26.3.x (A12/A13, PPL)";
+            // R34 支持矩阵诚实化（A 三档定案，00:3x）：实证=15.0~16.5.1（kfd+dmaFail）；
+            // 16.6.1+（ClearSword/momentarius/DarkSword 链）代码在树、实机回归未做=实验性。
+            // 砍单前此串曾写"18.7.6/26.3.x"（11:55 拉宽）——纸面推断，按用户"只留验证过的"收回。
+            // A 11:46 声明窗终定（43520 修复点 18.7.2/26.1 硬边界）：实验性段
+            // 上限随 DarkSword 声明窗收敛至 18.7.1+26.0.1，26.1+ 无链。
+            return @"iOS 15.0 - 16.5.1（实证）；16.6.1 - 18.7.1 / 26.0 - 26.0.1 实验性（实机验证未完成）";
         }
         else if (![self isSPTM]) {
-            return @"iOS 15.0 - 17.3.1 (PPL)";
+            // A14（PPL）：L1 会话档 16.6.1-18.7.1 可行（43520 data-only 不需 PPL，
+            // A 11:47 认知修正）；持久化档断在 17.4+（Rocket 17.4 被修，无公开替代）。
+            return @"iOS 15.0 - 17.3.1（持久化）；16.6.1 - 18.7.1 L1 会话实验性";
         }
         else {
-            return @"iOS 17.0 - 17.3.1 (SPTM)";
+            // A15+（SPTM）：同上——L1 会话档全域可行，持久化档断在 17.4。
+            return @"iOS 17.0 - 17.3.1（持久化）；16.6.1 - 18.7.1 / 26.0 - 26.0.1 L1 会话实验性";
         }
     }
     else {
-        return @"iOS 15.0 - 18.7.6 (arm64)";
+        // arm64：16.6+ 无 PPL bypass（dmaFail≤16.5.1、Titan 限 A14–A17、momentarius 限 A12/A13）→断链
+        return @"iOS 15.0 - 16.5.1（实证）；16.6+ 不支持（PPL 断链）";
     }
 }
 
@@ -331,6 +342,45 @@ extern char **environ;
 - (BOOL)isBootstrapped
 {
     return (BOOL)jbinfo(rootPath);
+}
+
+// R34 三态（用户 00:19"卡住→退出显示已越狱"配套，汇总员派单①余项）：
+// hasLeftoverBootstrap=jbroot 存在（上次装过/半程残留）但当前未越狱——
+// UI 据此显示"检测到未完成/残留环境"，引导用户重点越狱按钮幂等续跑，
+// 而不是误读为"已越狱"。与 daemon 侧 .bootstrap_complete 双证判定配套：
+// jbroot 在 + 标记不在 = 半程（卡死/中断）。
+- (BOOL)hasLeftoverBootstrap
+{
+    return [self isBootstrapped] && ![self isJailbroken];
+}
+
+// R37（用户 2026-08-29 00:11 定案，取代 R36 推断式判定）：
+// 三态=roothide/rootful 都没勾 → 默认 rootless（无隐藏软件，只有隐/显越狱）；
+// 勾 roothide → roothide 模式（隐藏软件双开关）；
+// 勾 rootful → 自动捆绑 roothide（服务端 jbsettings 写入侧+daemon 双兜底强制），
+//              rootful 会话同样走 roothide 隐藏栈（用户令：rootful 默认为 roothide）。
+// 消费方：EUSettingsController（隐藏软件双开关 vs 隐/显越狱单开关的渲染分叉）。
+- (BOOL)isRoothideMode
+{
+    if (![self isJailbroken]) return NO;
+    if (jbclient_jbsettings_get_bool("roothideUserEnabled")) return YES;
+    // rootful 开着但 roothide 没开=违反联动的存量状态，服务端已兜底关 rootful；
+    // 这里按"rootful 捆绑 roothide"语义视作 roothide（隐藏栈在 rootful 下也要在）。
+    if (jbclient_jbsettings_get_bool("rootfulUserEnabled")) return YES;
+    return NO; // 都没勾=纯 rootless
+}
+
+// R38（用户 2026-08-29 11:41 定案）："检测是 rootful 还是普通 roothide，
+// 以此决定屏蔽软件的目标方向"——屏蔽软件双形态的 App 侧读出。
+// daemon 在每次越狱时按 rootfulWanted 落形态（stealth 3 vs 1，幂等重放），
+// 此处读 rootfulUserEnabled 同源判定；cloak 实际 policy（含用户手动覆盖）
+// 以 jbsettings cloakStealthLevel 为准。
+- (NSUInteger)cloakStealthForm
+{
+    if (![self isJailbroken]) return 0;
+    if (jbclient_jbsettings_get_bool("rootfulUserEnabled")) return 3; // 深档（rootful 态）
+    if ([self isRoothideMode]) return 1;                             // 基础档（普通 roothide）
+    return 0;                                                        // rootless：隐藏栈未随行
 }
 
 - (void)runUnsandboxed:(void (^)(void))unsandboxBlock

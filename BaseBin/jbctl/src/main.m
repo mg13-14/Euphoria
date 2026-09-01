@@ -340,6 +340,8 @@ int main(int argc, char* argv[])
 		                        else if (!strcmp(key, "hideCredentials")) policy.hideCredentials = atoi(value);
 		                        else if (!strcmp(key, "hideTrustcache")) policy.hideTrustcache = atoi(value);
 		                        else if (!strcmp(key, "stealthLevel")) policy.stealthLevel = strtoull(value, NULL, 10);
+		                        // R40: blacklistMode=<0|1>（黑名单制开关——拉黑的 app 才被过滤）
+		                        else if (!strcmp(key, "blacklistMode")) policy.blacklistMode = (strtoull(value, NULL, 10) != 0);
 		                }
 		                int r = cloak_set_options(&policy);
 		                if (r != 0) {

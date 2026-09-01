@@ -54,6 +54,10 @@ struct system_info {
 		bool cloakHideCredentials;
 		bool cloakHideTrustcache;
 		uint64_t cloakStealthLevel;
+		// R40（用户 2026-08-29 17:00 定案）：屏蔽软件黑名单制——拉黑的 app 检测不到
+		// 越狱环境；名单外（文件管理器等越狱生态工具）正常可见可管。读路径统一
+		// 走本键（cloak GET_POLICY 表满 8 参装不下，set_options 入参侧同步写此键）。
+		bool cloakBlacklistMode;
 		// Euphoria aegis (per-app shielding) settings
 		bool aegisEnabled;
 		uint64_t aegisDefaultLevel;
@@ -63,6 +67,11 @@ struct system_info {
 		// The jailbreak flow itself branches on this toggle (see
 		// activate_rootful_and_cloak in BaseBin/euphoria/src/main.m).
 		bool rootfulUserEnabled;
+		// R37（用户 2026-08-29 00:11 定案）：roothide 独立用户开关。
+		//   三态联动：roothide/rootful 都没勾=默认 rootless；
+		//   rootful 勾选=自动捆绑 roothide（关 roothide 则强制关 rootful）。
+		//   daemon 侧 rootfulWanted 以 roothideUserEnabled 为前置。
+		bool roothideUserEnabled;
 	} jailbreakSettings;
 
 	struct {
@@ -453,9 +462,11 @@ extern struct system_info gSystemInfo;
         iterator(ctx, jailbreakSettings.cloakHideCredentials); \
         iterator(ctx, jailbreakSettings.cloakHideTrustcache); \
         iterator(ctx, jailbreakSettings.cloakStealthLevel); \
+        iterator(ctx, jailbreakSettings.cloakBlacklistMode); \
 	iterator(ctx, jailbreakSettings.aegisEnabled); \
 	iterator(ctx, jailbreakSettings.aegisDefaultLevel); \
-	iterator(ctx, jailbreakSettings.rootfulUserEnabled);
+	iterator(ctx, jailbreakSettings.rootfulUserEnabled); \
+	iterator(ctx, jailbreakSettings.roothideUserEnabled);
 
 #define KERNEL_SYMBOLS_ITERATE(ctx, iterator) \
 	iterator(ctx, kernelSymbol.perfmon_dev_open); \

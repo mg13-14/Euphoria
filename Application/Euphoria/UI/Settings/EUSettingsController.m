@@ -8,14 +8,19 @@
 #import "EUSettingsController.h"
 #import <objc/runtime.h>
 #import <Photos/Photos.h>
+#import <sys/sysctl.h>
+#import <sys/types.h>
 #import <libjailbreak/util.h>
 #import "EUUIManager.h"
 #import "EUPkgManagerPickerViewController.h"
 #import "EUHeaderCell.h"
 #import "EUEnvironmentManager.h"
+#import "EUPreferenceManager.h"
 #import "EUExploitManager.h"
 #import "EUPSListItemsController.h"
 #import "EUPSExploitListItemsController.h"
+#import "EUThemeManager.h"
+#import "EUSceneDelegate.h"
 #import "EUPSJetsamListItemsController.h"
 #import "EUButtonCell.h"
 
@@ -27,12 +32,28 @@
 
 - (void)viewDidLoad
 {
+    _lastKnownTheme = [[EUThemeManager sharedInstance] enabledTheme].key;
     [super viewDidLoad];
 }
 
 - (void)viewWillAppear:(BOOL)arg1
 {
     [super viewWillAppear:arg1];
+    if (_lastKnownTheme != [[EUThemeManager sharedInstance] enabledTheme].key)
+    {
+        [EUSceneDelegate relaunch];
+        NSString *icon = [[EUThemeManager sharedInstance] enabledTheme].icon;
+        [[UIApplication sharedApplication] setAlternateIconName:icon completionHandler:^(NSError * _Nullable error) {
+            if (error)
+                NSLog(@"Error changing app icon: %@", error);
+        }];
+
+        if ([EUEnvironmentManager sharedManager].isJailbroken) {
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                [[EUEnvironmentManager sharedManager] updateBootLogo];
+            });
+        }
+    }
 }
 
 - (NSArray *)availableKernelExploitIdentifiers
@@ -93,6 +114,16 @@
         [names addObject:exploit.name];
     }
     return names;
+}
+
+- (NSArray *)themeIdentifiers
+{
+    return [[EUThemeManager sharedInstance] getAvailableThemeKeys];
+}
+
+- (NSArray *)themeNames
+{
+    return [[EUThemeManager sharedInstance] getAvailableThemeNames];
 }
 
 - (NSArray *)jetsamOptionNumbers
@@ -236,6 +267,10 @@
             [jetsamSpecifier setProperty:@"jetsamOptionNumbers" forKey:@"valuesDataSource"];
             [jetsamSpecifier setProperty:@"jetsamOptionTitles" forKey:@"titlesDataSource"];
             [specifiers addObject:jetsamSpecifier];
+
+            // R34 rootful 开关=C 侧统一落地（jbctl rootful enable/disable 实测后端，
+            // 见下方 Section_Rootful 段+eutrolle_rootfulSupported 矩阵判定）；
+            // B 侧 jbsettings 路线已去重移除，避免双开关/双访问器冲突。
             
             if (!envManager.isJailbroken && !envManager.isInstalledThroughTrollStore) {
                 PSSpecifier *removeJailbreakSwitchSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Button_Remove_Jailbreak") target:self set:@selector(setRemoveJailbreakEnabled:specifier:) get:defGetter detail:nil cell:PSSwitchCell edit:nil];
@@ -278,15 +313,58 @@
                     [specifiers addObject:reinstallPackageManagersSpecifier];
                 }
 
-                // R27（用户 08:44:43/08:45:50）："我们都是roothide，隐/显越狱可以不要了"
-                // ——Hide/Unhide Jailbreak 入口整体移除（入口+文案键）；
-                //   roothide 本体隐藏（cloakd/aegis，R7/R9）不受影响，仅移除用户面手动开关。
+                // R37（用户 2026-08-29 00:11 定案）：roothide 独立开关。
+                // 联动：开 rootful 自动开 roothide；关 roothide 强制关 rootful
+                // （服务端 jbsettings 兜底 + 本地偏好同步）。
+                {
+                    PSSpecifier *roothideSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Roothide_Mode") target:self set:@selector(setRoothideEnabled:specifier:) get:@selector(readRoothideEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+                    [roothideSpecifier setProperty:@YES forKey:@"enabled"];
+                    [roothideSpecifier setProperty:@"roothideUserEnabled" forKey:@"key"];
+                    [roothideSpecifier setProperty:@NO forKey:@"default"];
+                    [roothideSpecifier setProperty:EULocalizedString(@"Roothide_Mode_Footer") forKey:@"footer"];
+                    [specifiers addObject:roothideSpecifier];
+                }
 
-                if (!envManager.isJailbroken && envManager.isInstalledThroughTrollStore) {
-                    // The "Remove Jailbreak" button cannot show when being jailbroken since pressing it would kinda be russian roulette
-                    // It might work, it might not and panic your device and leave it in a half uninstalled state
-                    // So this button is only for when you're not jailbroken and have Euphoria installed with TrollStore
-                    // The only supported uninstallation flow without TrollStore is to reboot and "rejailbreak" with "Remove Jailbreak" toggle enabled
+                // R36（用户 10:27:28 定案）：选择 rootless（未勾 rootful/roothide）时
+                // **不给隐藏软件**（aegis/cloak 仅随 roothide 模式），改给"隐/显越狱"
+                // 手动入口（Dopamine 同款：jailbreak 应用从主屏图标隐藏，Spotlight 可找回）。
+                // 两个开关改为仅 roothide 模式渲染：
+                //   aegis = "隐藏越狱应用"（图标隐藏），cloak = 系统级痕迹隐藏
+                //   （两者本质都是 roothide 隐藏环境的手动门，rootless 纯净态不该出现）。
+                BOOL roothideMode = [[EUEnvironmentManager sharedManager] isRoothideMode];
+                if (roothideMode) {
+                    PSSpecifier *aegisSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Hide_Jailbreak_Apps") target:self set:@selector(setAegisHidden:specifier:) get:@selector(readAegisHidden:) detail:nil cell:PSSwitchCell edit:nil];
+                    [aegisSpecifier setProperty:@YES forKey:@"enabled"];
+                    [aegisSpecifier setProperty:@"aegisEnabled" forKey:@"key"];
+                    [aegisSpecifier setProperty:@NO forKey:@"default"];
+                    [aegisSpecifier setProperty:EULocalizedString(@"Hide_Jailbreak_Apps_Footer") forKey:@"footer"];
+                    [specifiers addObject:aegisSpecifier];
+
+                    PSSpecifier *cloakSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Hide_Jailbreak_Traces") target:self set:@selector(setCloakEnabled:specifier:) get:@selector(readCloakEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+                    [cloakSpecifier setProperty:@YES forKey:@"enabled"];
+                    [cloakSpecifier setProperty:@"cloakEnabled" forKey:@"key"];
+                    [cloakSpecifier setProperty:@NO forKey:@"default"];
+                    [cloakSpecifier setProperty:EULocalizedString(@"Hide_Jailbreak_Traces_Footer") forKey:@"footer"];
+                    [specifiers addObject:cloakSpecifier];
+                }
+                else {
+                    // rootless：隐/显越狱（Dopamine 同款语义——把越狱 App 本体从
+                    // 主屏隐藏，Spotlight/设置可找回；与 roothide 的系统级隐藏不同层）。
+                    // 复用 aegis 同一后端（jbctl aegis add/remove dev.euphoria.Euphoria），
+                    // 文案键按 Dopamine 惯例叫"Hide Jailbreak"。
+                    PSSpecifier *hideJbSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Hide_Jailbreak") target:self set:@selector(setAegisHidden:specifier:) get:@selector(readAegisHidden:) detail:nil cell:PSSwitchCell edit:nil];
+                    [h[hideJbSpecifier setProperty:@YES forKey:@"enabled"];
+                    [h[hideJbSpecifier setProperty:@"jailbreakHidden" forKey:@"key"];
+                    [h[hideJbSpecifier setProperty:@NO forKey:@"default"];
+                    [h[hideJbSpecifier setProperty:EULocalizedString(@"Hide_Jailbreak_Footer") forKey:@"footer"];
+                    [specifiers addObject:hideJbSpecifier];
+                }
+
+                // 移除越狱按钮（用户 08-28 00:19："越狱后移除越狱的按钮被吃掉了吗"——恢复越狱态可见）
+                // 越狱中按下=deleteBootstrap 后 userspace reboot 完成卸载（removeJailbreakPressed 现有逻辑）；
+                // 未越狱=任意安装渠道（TrollStore/自签）都可清残留 /var/jb。
+                // 原 Dopamine 注释的" russian roulette"担忧仅指不重启的半卸载；本流程删后必重启，安全。
+                {
                     PSSpecifier *removeJailbreakSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
                     [removeJailbreakSpecifier setProperty:@"Button_Remove_Jailbreak" forKey:@"title"];
                     [removeJailbreakSpecifier setProperty:[EUButtonCell class] forKey:@"cellClass"];
@@ -296,6 +374,41 @@
                     [specifiers addObject:removeJailbreakSpecifier];
                 }
             }
+        }
+
+        // Rootful（T15 前端消费契约 · 用户 08-26 指令被漏实现，08-28 00:19 点名补齐）
+        // 实测后端=jbctl rootful enable/disable（in-memory remount+overlay）；
+        // 矩阵（R4）：A12/A13 @ iOS 16.6.1–18.7.1 → 默认开；矩阵外整段隐藏（灰置版留 V0.9.2）。
+        // purge 按钮后端不存在（jbctl 无 purge 子命令，T15 规格超前）——暂不显示，待后端落地。
+        if ([self eutrolle_rootfulSupported]) {
+            PSSpecifier *rootfulGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+            rootfulGroupSpecifier.name = EULocalizedString(@"Section_Rootful");
+            [specifiers addObject:rootfulGroupSpecifier];
+
+            PSSpecifier *rootfulSwitchSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Rootful_Mode") target:self set:@selector(setRootfulEnabled:specifier:) get:@selector(readRootfulEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+            [rootfulSwitchSpecifier setProperty:@YES forKey:@"enabled"];
+            [rootfulSwitchSpecifier setProperty:@"rootfulUserEnabled" forKey:@"key"];
+            [rootfulSwitchSpecifier setProperty:@NO forKey:@"default"]; // 默认关（05 §5.1；用户原话"给他一个可以选择的"=用户主动选择。T15/R4 的"矩阵内默认开"与 05 冲突，规划师 v16 评审取保守值）
+            [rootfulSwitchSpecifier setProperty:EULocalizedString(@"Rootful_Mode_Footer") forKey:@"footer"];
+            [specifiers addObject:rootfulSwitchSpecifier];
+        }
+
+        PSSpecifier *themingGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+        themingGroupSpecifier.name = EULocalizedString(@"Section_Customization");
+        [specifiers addObject:themingGroupSpecifier];
+
+        // 皮肤选择器（用户 08-28 10:18 裁定"背景板一个就行"）：单一品牌色后仅 1 套主题
+        // →选择器入口隐藏（无意义的多选一）；未来若恢复多皮肤（皮肤↔图标 1:1 联动）
+        // 数组自然 >1，入口自动回来——按数量动态显隐，不写死。
+        if ([[self themeIdentifiers] count] > 1) {
+            PSSpecifier *themeSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Theme") target:self set:defSetter get:defGetter detail:nil cell:PSLinkListCell edit:nil];
+            themeSpecifier.detailControllerClass = [EUPSListItemsController class];
+            [themeSpecifier setProperty:@YES forKey:@"enabled"];
+            [themeSpecifier setProperty:@"theme" forKey:@"key"];
+            [themeSpecifier setProperty:[[self themeIdentifiers] firstObject] forKey:@"default"];
+            [themeSpecifier setProperty:@"themeIdentifiers" forKey:@"valuesDataSource"];
+            [themeSpecifier setProperty:@"themeNames" forKey:@"titlesDataSource"];
+            [specifiers addObject:themeSpecifier];
         }
 
         PSSpecifier *bootlogoGropSpecifier = [PSSpecifier emptyGroupSpecifier];
@@ -674,6 +787,136 @@
     [[EUUIManager sharedInstance] resetSettings];
     [self.navigationController popToRootViewControllerAnimated:YES];
     [self reloadSpecifiers];
+}
+
+#pragma mark - Rootful（T15）与 Aegis（R27 恢复）
+
+// R4 rootful 矩阵：A12/A13 @ iOS 16.6.1–18.7.1
+// （cpufamily 值与 dmaFail.c 设备表同源：A12=0x07D34B9F / A13=0x462504D2）
+- (BOOL)eutrolle_rootfulSupported
+{
+    cpu_subtype_t cpuFamily = 0;
+    size_t len = sizeof(cpuFamily);
+    if (sysctlbyname("hw.cpufamily", &cpuFamily, &len, NULL, 0) != 0) return NO;
+
+    BOOL cpuOK = (cpuFamily == 0x07D34B9F /* A12 */ || cpuFamily == 0x462504D2 /* A13 */);
+    if (!cpuOK) return NO;
+
+    NSOperatingSystemVersion v = [NSProcessInfo processInfo].operatingSystemVersion;
+    if (v.majorVersion != 16 && v.majorVersion != 17 && v.majorVersion != 18) return NO;
+    if (v.majorVersion == 16 && v.minorVersion < 6) return NO;                    // <16.6
+    if (v.majorVersion == 16 && v.minorVersion == 6 && v.patchVersion < 1) return NO; // 16.6.0
+    if (v.majorVersion == 18 && v.minorVersion > 7) return NO;                   // >18.7
+    if (v.majorVersion == 18 && v.minorVersion == 7 && v.patchVersion > 1) return NO; // >18.7.1
+    return YES;
+}
+
+- (id)readRootfulEnabled:(PSSpecifier *)specifier
+{
+    EUEnvironmentManager *envManager = [EUEnvironmentManager sharedManager];
+    if (envManager.isJailbroken) {
+        // BaseBin 真值源（main.m L411 jbclient_jbsettings_get_bool("rootfulUserEnabled")）
+        bool v = jbclient_jbsettings_get_bool("rootfulUserEnabled");
+        return @(v);
+    }
+    return [self readPreferenceValue:specifier];
+}
+
+- (void)setRootfulEnabled:(id)value specifier:(PSSpecifier *)specifier
+{
+    [self setPreferenceValue:value specifier:specifier];
+    EUEnvironmentManager *envManager = [EUEnvironmentManager sharedManager];
+    BOOL enable = ((NSNumber *)value).boolValue;
+    // R37 联动（用户 2026-08-29 00:11）："选了 rootful 会自动给你选 roothide"——
+    // 本地偏好先落（未越狱态也生效，下次越狱 BaseBin 读取）；
+    // 越狱态再同步 XPC（服务端 jbsettings 写入侧还有一层捆绑兜底）。
+    if (enable) {
+        [[EUPreferenceManager sharedManager] setPreferenceValue:@YES forKey:@"roothideUserEnabled"];
+        if (envManager.isJailbroken) {
+            jbclient_platform_jbsettings_set_bool("roothideUserEnabled", YES);
+        }
+    }
+    if (!envManager.isJailbroken) return; // 未越狱：仅记偏好，下次越狱时 BaseBin 读取生效
+    // ①持久化：写 BaseBin 消费的 jbsettings 键（重越狱后按此分支 rootful/roothide 模式）
+    jbclient_platform_jbsettings_set_bool("rootfulUserEnabled", enable);
+    // ②即时生效：jbctl rootful enable/disable（in-memory remount+overlay；实测命令名，T15 文档的
+    //   "internal rootful" 与实际不符）。purge 子命令后端不存在（T15 超前），按钮不挂出。
+    int r = [envManager spawnJbctlAsRootWithArgs:@[@"rootful", enable ? @"enable" : @"disable"]];
+    if (r != 0) {
+        [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:
+            @"rootful %@ 失败（jbctl 返回 %d）", enable ? @"enable" : @"disable", r] debug:NO];
+    }
+}
+
+// R37：roothide 独立开关读写——关 roothide 强制关 rootful（用户 00:11 定案）。
+- (id)readRoothideEnabled:(PSSpecifier *)specifier
+{
+    EUEnvironmentManager *envManager = [EUEnvironmentManager sharedManager];
+    if (envManager.isJailbroken) {
+        return @(jbclient_jbsettings_get_bool("roothideUserEnabled"));
+    }
+    return [self readPreferenceValue:specifier];
+}
+
+- (void)setRoothideEnabled:(id)value specifier:(PSSpecifier *)specifier
+{
+    [self setPreferenceValue:value specifier:specifier];
+    BOOL enable = ((NSNumber *)value).boolValue;
+    if (!enable) {
+        // "关了 roothide 就不能开 rootful"——本地偏好+XPC 双关
+        [[EUPreferenceManager sharedManager] setPreferenceValue:@NO forKey:@"rootfulUserEnabled"];
+    }
+    EUEnvironmentManager *envManager = [EUEnvironmentManager sharedManager];
+    if (!envManager.isJailbroken) return;
+    jbclient_platform_jbsettings_set_bool("roothideUserEnabled", enable);
+    if (!enable) {
+        jbclient_platform_jbsettings_set_bool("rootfulUserEnabled", NO);
+        [[EUUIManager sharedInstance] sendLog:@"Roothide 关闭：rootful 已按联动规则强制关闭（下次越狱生效）" debug:NO];
+    }
+}
+
+- (void)purgeRootfulPressed
+{
+    // 后端（jbctl purge 子命令）尚未落地（T15 规格超前）——保留方法体，按钮暂不挂出。
+    // 待 B 落"卸载+销毁卷+清状态"后端后，在 Rootful 段恢复红色按钮+二次确认。
+    [[EUUIManager sharedInstance] sendLog:@"rootful purge 后端未落地（按钮已按实际能力隐藏）" debug:YES];
+}
+
+- (id)readCloakEnabled:(PSSpecifier *)specifier
+{
+    return [self readPreferenceValue:specifier];
+}
+
+- (void)setCloakEnabled:(id)value specifier:(PSSpecifier *)specifier
+{
+    [self setPreferenceValue:value specifier:specifier];
+    if (![[EUEnvironmentManager sharedManager] isJailbroken]) return;
+    BOOL enable = ((NSNumber *)value).boolValue;
+    // 系统级隐藏越狱痕迹（roothide 语义）：jbctl cloak enable/disable
+    // （hideMounts/hideCredentials/hideTrustcache 默认随 enable 全开，cloakd 起 cover mount）
+    int r = [[EUEnvironmentManager sharedManager] spawnJbctlAsRootWithArgs:
+             @[@"cloak", enable ? @"enable" : @"disable"]];
+    if (r != 0) {
+        [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:
+            @"cloak %@ 失败（jbctl 返回 %d）", enable ? @"enable" : @"disable", r] debug:NO];
+    }
+}
+
+- (id)readAegisHidden:(PSSpecifier *)specifier
+{
+    return [self readPreferenceValue:specifier];
+}
+
+- (void)setAegisHidden:(id)value specifier:(PSSpecifier *)specifier
+{
+    [self setPreferenceValue:value specifier:specifier];
+    if (![[EUEnvironmentManager sharedManager] isJailbroken]) return;
+    BOOL hide = ((NSNumber *)value).boolValue;
+    // 越狱本体加入/移出 Aegis 隐藏策略（per-app；jbctl aegis add/remove，
+    // aegisd 持久化到 /basebin/aegis.conf，重启越狱后仍然生效）
+    NSString *selfBundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"dev.euphoria.Euphoria";
+    [[EUEnvironmentManager sharedManager] spawnJbctlAsRootWithArgs:
+     @[@"aegis", hide ? @"add" : @"remove", selfBundleID]];
 }
 
 

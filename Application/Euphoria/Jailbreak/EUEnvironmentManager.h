@@ -31,6 +31,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)isJailbroken;
 - (BOOL)isJailbrokenWithOtherJailbreak;
 - (BOOL)isBootstrapped;
+- (BOOL)hasLeftoverBootstrap;
+- (BOOL)isRoothideMode;
+// R38：屏蔽形态检测（rootful 态=深档 stealth 3 / 普通 roothide=基础档 stealth 1）
+// 形态源=jbsettings rootfulUserEnabled（与 isRoothideMode 同源，R37 联动保证
+// rootful 开则 roothide 必开）。返回 3=深档（rootful），1=基础档（roothide），0=未启用。
+- (NSUInteger)cloakStealthForm;
 - (NSString *)jailbrokenVersion;
 - (NSString *)systemVersion;
 

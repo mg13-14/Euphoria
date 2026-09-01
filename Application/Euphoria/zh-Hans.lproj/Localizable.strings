@@ -1,4 +1,4 @@
-"Credits_Made_By" = "作者：opa334, évelyne (ElleKit)";
+"Credits_Made_By" = "Euphoria 团队出品 · 特别致谢 mg13-14 与 GLM-4-Plus/Z.ai";
 
 // Log
 "Status_Title_Jailbreaking" = "正在越狱";
@@ -122,3 +122,21 @@
 "Continue" = "继续";
 "Credits_Special_Thanks" = "特别致谢";
 "Credits_AI_Assistance" = "AI 协作";
+
+/* Rootful (T15) & Aegis (R27 restored, user 08-28) */
+"Section_Rootful" = "Rootful（传统挂载）";
+"Rootful_Mode" = "Rootful 模式";
+"Rootful_Mode_Footer" = "适用于支持的设备（A12/A13，iOS 16.6.1–18.7.1）。首次激活约需数分钟，关闭时卷与数据保留。";
+"Button_Purge_Rootful" = "彻底删除 Rootful 卷";
+"Alert_Purge_Rootful_Title" = "彻底删除 Rootful 卷";
+"Alert_Purge_Rootful_Body" = "将卸载 rootful 覆盖挂载、销毁卷并清空状态，不可恢复。确定继续吗？";
+"Hide_Jailbreak_Apps" = "隐藏越狱应用";
+"Hide_Jailbreak_Apps_Footer" = "通过 Aegis 隐藏策略隐藏 Euphoria 图标；隐藏期间可用 Spotlight 搜索或设置找回。";
+"Hide_Jailbreak_Traces" = "隐藏越狱痕迹";
+"Hide_Jailbreak_Traces_Footer" = "通过 Cloak 进行系统级隐藏：隐藏越狱挂载点、凭证与信任缓存（roothide 同款语义）。切换后建议重启生效。";
+// R36 hide jailbreak (rootless)
+"Hide_Jailbreak" = "隐/显越狱";
+"Hide_Jailbreak_Footer" = "将 Euphoria 图标从主屏隐藏，可通过 Spotlight 搜索找回（与多巴胺行为一致）。";
+// R37 roothide mode
+"Roothide_Mode" = "Roothide 隐藏模式";
+"Roothide_Mode_Footer" = "对应用隐藏越狱（roothide）。Rootful 依赖它：开 rootful 会自动开 roothide；关 roothide 则 rootful 不可用。";

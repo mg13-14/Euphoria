@@ -119,7 +119,7 @@
                     return;
                 }
             }
-            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://github.com/mg13-14/Euphoria/releases"] options:@{} completionHandler:nil];
+            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://github.com/euphoria-jb/Euphoria/releases"] options:@{} completionHandler:nil];
             return;
         }
 

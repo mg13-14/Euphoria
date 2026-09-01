@@ -11,33 +11,26 @@
 #import "EUBootstrapper.h"
 #import "EUExploitManager.h"
 #import <libjailbreak/util.h>
-#import <libjailbreak/jbroot.h>
+#import <libjailbreak/kernel.h>      // proc_ucred（B25-1 ② 17+ 直接内核写入）
+#import <libjailbreak/primitives.h>  // kread32/kwrite32/kread_ptr
 #import <libjailbreak/trustcache.h>
 #import <libjailbreak/info.h>
 #import <choma/Fat.h>
 #import <choma/MachO.h>
 #import <choma/CSBlob.h>
-#import <objc/message.h>
 #import <dlfcn.h>
 #import <sys/sysctl.h>
 #import <string.h>
 #import <unistd.h>
+#import <limits.h>                   // NGROUPS_MAX（rootify groups 缓冲）
+#import <objc/message.h>             // objc_msgSend（B25-1 ③ 私有类运行时调用）
+#import <objc/runtime.h>             // NSClassFromString/sel_registerName
+#import <mach-o/loader.h>            // MH_MAGIC_64（MachO 探测，custom 法权限修正）
+#import <mach-o/fat.h>               // FAT_MAGIC（FAT 探测）
 
 NSString *const EUTrollEErrorDomain = @"EUTrollEErrorDomain";
 
 #define EUTrolleLog(fmt, ...) [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:fmt, ##__VA_ARGS__] debug:NO]
-
-// This file is also compiled into the BaseBin/euphoria CLI, which links no
-// UIKit — resolve UIApplication at runtime instead of at link time.
-static void EUTrollEOpenURL(NSURL *url)
-{
-    Class uiApplicationClass = NSClassFromString(@"UIApplication");
-    if (!uiApplicationClass) return;
-    id app = ((id (*)(id, SEL))objc_msgSend)((id)uiApplicationClass, sel_registerName("sharedApplication"));
-    if (!app) return;
-    ((void (*)(id, SEL, NSURL *, NSDictionary *, id))objc_msgSend)(
-        app, sel_registerName("openURL:options:completionHandler:"), url, @{}, nil);
-}
 
 #pragma mark - ChOma C 桥接（CDHash 计算）
 
@@ -162,7 +155,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
 
     // 前置：越狱态（信任缓存 XPC 通道）
     if (!jailbroken) {
-        if (error) *error = fail(EUTrollEErrorCodeNotJailbroken, @"巨魔E 该模式需要越狱状态（免越狱安装为 Engine B，V0.9.1 目标）");
+        if (error) *error = fail(EUTrollEErrorCodeNotJailbroken, @"巨魔E 该模式需要越狱状态（免越狱安装为 Engine B，V0.9.2 目标）");
         return NO;
     }
 
@@ -175,7 +168,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     NSString *appBundlePath = nil;
 
     // ① 解包（.ipa → 暂存目录；.app 直接用）
-    if ([appURL.pathExtension caseInsensitiveCompare:@"ipa"] == NSOrderedSame) {
+    if ([appURL.pathExtension.caseInsensitiveCompare:@"ipa"] == NSOrderedSame) {
         NSString *unzipPath = JBROOT_PATH(@"/usr/bin/unzip");
         if (![[NSFileManager defaultManager] isExecutableFileAtPath:unzipPath]) {
             if (error) *error = fail(EUTrollEErrorCodeUnzipMissing, @"缺少 unzip（请先在包管理器中安装 unzip 包，Procursus 源提供）");
@@ -205,7 +198,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
             }
         }
     }
-    else if ([appURL.pathExtension caseInsensitiveCompare:@"app"] == NSOrderedSame) {
+    else if ([appURL.pathExtension.caseInsensitiveCompare:@"app"] == NSOrderedSame) {
         appBundlePath = appURL.path;
     }
 
@@ -255,7 +248,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     }
 
     // ⑤ uicache 刷新图标
-    int r = exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"),
+    int r = exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache").fileSystemRepresentation,
                              "-p", destPath.fileSystemRepresentation, NULL);
     if (r != 0) {
         EUTrolleLog(@"巨魔E：uicache 返回 %d（图标可能需注销后出现）", r);
@@ -308,7 +301,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     [entries filterUsingPredicate:[NSPredicate predicateWithFormat:@"bundleID != %@", bundleID]];
     [self saveEntries:entries];
 
-    exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"), "-u", [target[@"path"] stringByDeletingLastPathComponent].fileSystemRepresentation, NULL);
+    exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache").fileSystemRepresentation, "-u", [target[@"path"] stringByDeletingLastPathComponent].fileSystemRepresentation, NULL);
     return removed;
 }
 
@@ -432,59 +425,266 @@ static BOOL EUTrollEExtractZipWithLibarchive(NSString *zipPath, NSString *destDi
     return ok;
 }
 
-/// CT 永久签名安装：MobileInstallation 私有框架（root 上下文，TrollHelper 同构路线）
-/// IPA 构建期已带 CT 漏洞签名（ldid 假签/多签名混淆）→ installd 经 CoreTrust 误验证通过
-/// → 应用以"永久签名"形态注册（重启/无越狱均可用，TrollStore 语义）。
-static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
+/// CT 永久签名安装（B25-1 ③ 重做，2026-08-31：TrollStore custom 法 in-process 移植）。
+///
+/// 推翻原 MobileInstallationInstall 路线的根因（B25-1 评审，源码级对照 opa334/TrollStore@master）：
+/// "TrollHelper 同构"不成立——TrollHelper 的 installd 通道背后是 TrollStore 本体经 CT
+/// 漏洞获得的 entitlements（RootHelper 带全套通行证）；Engine B 进程只有 KRW root 没有
+/// 这些通行证，XPC 门槛可能拒收。TrollStore 真实安装链（RootHelper/main.m custom 分支）：
+///   MCMAppContainer 直建 Bundle 容器 → 文件系统直拷 .app → 写 `_TrollStore` 标记 →
+///   fixPermissionsOfAppBundle 两遍法 → LSApplicationWorkspace 注册字典直注册。
+/// 全程不经 installd XPC，语义=同步拷贝+注册，无异步回调竞态面（原 30s 信号量等待删除）。
+///
+/// ⚠️ 剩余已知风险（B25-1 ➕ 新发现，v1.2 风险簿首位）：lsd/containermanagerd 侧
+/// entitlement 门禁——公开生态零先例（TrollStore=有 entitlement；越狱=有 AMFI 补丁；
+/// 我们两条都不占）。三候选 spike（csflags 平台位单点写入 / 内核 entitlements 指针
+/// 移植 / 绕 XPC 直写）由 B 线排期实机裁决；本实现的失败路径保持清晰可观测，
+/// 供 spike 定位。
+
+// MARK: MachO 文件探测（TrollStore main.m isMachoFile 同构；决定 0755 提权位）
+static BOOL EUTrollEIsMachoFile(NSString *filePath)
 {
-    void *mi = dlopen("/System/Library/PrivateFrameworks/MobileInstallation.framework/MobileInstallation", RTLD_NOW);
-    if (!mi) {
-        if (error) *error = [NSError errorWithDomain:EUTrollEErrorDomain code:EUTrollEErrorCodePermasignInstallFailed
-                                             userInfo:@{NSLocalizedDescriptionKey : @"MobileInstallation 私有框架加载失败"}];
-        return NO;
+    FILE *file = fopen(filePath.fileSystemRepresentation, "r");
+    if (!file) return NO;
+    uint32_t magic = 0;
+    size_t rd = fread(&magic, sizeof(uint32_t), 1, file);
+    fclose(file);
+    if (rd != 1) return NO;
+    return magic == FAT_MAGIC || magic == FAT_CIGAM ||
+           magic == MH_MAGIC_64 || magic == MH_CIGAM_64;
+}
+
+// MARK: 权限修正两遍法（TrollStore main.m:178 fixPermissionsOfAppBundle 同构）
+// 第一遍全量 chown(33,33)+chmod 0644；第二遍目录与 MachO 可执行提权 0755
+static void EUTrollEFixPermissionsOfAppBundle(NSString *appBundlePath)
+{
+    NSDirectoryEnumerator *enumerator = [[NSFileManager defaultManager]
+        enumeratorAtURL:[NSURL fileURLWithPath:appBundlePath]
+        includingPropertiesForKeys:nil options:0 errorHandler:nil];
+    for (NSURL *fileURL in enumerator) {
+        chown(fileURL.path.fileSystemRepresentation, 33, 33);
+        chmod(fileURL.path.fileSystemRepresentation, 0644);
     }
-    // 历史 ABI：int MobileInstallationInstall(NSString *path, NSDictionary *options, dispatch_queue_t cbq, void (^cb)(NSDictionary *), NSError **error)
-    int (*MIInstall)(NSString *, NSDictionary *, dispatch_queue_t, void (^)(NSDictionary *), NSError **) =
-        dlsym(mi, "MobileInstallationInstall");
-    if (!MIInstall) {
-        if (error) *error = [NSError errorWithDomain:EUTrollEErrorDomain code:EUTrollEErrorCodePermasignInstallFailed
-                                             userInfo:@{NSLocalizedDescriptionKey : @"MobileInstallationInstall 符号缺失（系统 ABI 变更，需按版本适配）"}];
-        return NO;
+    enumerator = [[NSFileManager defaultManager]
+        enumeratorAtURL:[NSURL fileURLWithPath:appBundlePath]
+        includingPropertiesForKeys:nil options:0 errorHandler:nil];
+    for (NSURL *fileURL in enumerator) {
+        BOOL isDir = NO;
+        [[NSFileManager defaultManager] fileExistsAtPath:fileURL.path isDirectory:&isDir];
+        if (isDir || EUTrollEIsMachoFile(fileURL.path)) {
+            chmod(fileURL.path.fileSystemRepresentation, 0755);
+        }
     }
-    NSError *miError = nil;
-    // B 评审修正（15:15）：MIInstall 为异步接口——回调由 installd 在完成/出错时触发，
-    // 返回值 r==0 仅代表"已受理"。TrollHelper 同构做法=信号量等回调终态（Progress=100
-    // 或 Error 键出现），否则后续步骤（helper 安装/登记重放表/UI 成功提示）会在
-    // installd 尚未落盘时竞态执行。30s 超时兜底防死等。
-    __block BOOL installSuccess = NO;
-    __block NSString *installErrorDesc = nil;
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    void (^cb)(NSDictionary *) = ^(NSDictionary *operation) {
-        if (![operation isKindOfClass:[NSDictionary class]]) return;
-        if (operation[@"Error"]) {
-            installErrorDesc = [NSString stringWithFormat:@"%@", operation[@"Error"]];
-            dispatch_semaphore_signal(sema);
+}
+
+// MARK: 注册（TrollStore uicache.m registerPath 同构移植）
+// 经 LSApplicationWorkspace 注册字典将 .app 登记进 LaunchServices。
+// 与 TrollStore 差异（裁剪，非门禁必需项）：Entitlements/TeamIdentifier/
+// GroupContainers/_LSBundlePlugins 需 ldid dump 或多容器构建，Engine B 首装
+// 本体场景从简（containerization 从简=默认容器化，container ID=bundleID——
+// TrollStore 对无 entitlements 应用走同一默认）。
+static BOOL EUTrollERegisterAppPath(NSString *appPath, BOOL forceSystem)
+{
+    if (!appPath) return NO;
+
+    NSDictionary *appInfoPlist = [NSDictionary dictionaryWithContentsOfFile:
+        [appPath stringByAppendingPathComponent:@"Info.plist"]];
+    NSString *appBundleID = appInfoPlist[@"CFBundleIdentifier"];
+    if (![appBundleID isKindOfClass:[NSString class]] || !appBundleID.length) return NO;
+
+    // data 容器（MCMAppDataContainer，TrollStore 同构；类经 dlopen 后 NSClassFromString 解析）
+    NSString *containerPath = nil;
+    void *mcm = dlopen("/System/Library/PrivateFrameworks/MobileContainerManager.framework/MobileContainerManager", RTLD_NOW);
+    if (mcm) {
+        Class dataContainerClass = NSClassFromString(@"MCMAppDataContainer");
+        if (dataContainerClass) {
+            id container = ((id (*)(id, SEL, NSString *, BOOL, BOOL *, NSError **))objc_msgSend)(
+                dataContainerClass,
+                sel_registerName("containerWithIdentifier:createIfNecessary:existed:error:"),
+                appBundleID, YES, NULL, NULL);
+            if (container) {
+                id containerURL = ((id (*)(id, SEL))objc_msgSend)(container, sel_registerName("url"));
+                containerPath = [containerURL path];
+            }
         }
-        else if ([operation[@"Progress"] isKindOfClass:[NSNumber class]] &&
-                 [(NSNumber *)operation[@"Progress"] integerValue] >= 100) {
-            installSuccess = YES;
-            dispatch_semaphore_signal(sema);
-        }
+    }
+
+    // LSApplicationWorkspace（dyld cache 内私有类；dlopen 触发映像加载后 NSClassFromString）
+    void *lsfw = dlopen("/System/Library/PrivateFrameworks/MobileCoreServices.framework/MobileCoreServices", RTLD_NOW);
+    if (!lsfw) lsfw = dlopen("/System/Library/Frameworks/MobileCoreServices.framework/MobileCoreServices", RTLD_NOW);
+    Class wsClass = NSClassFromString(@"LSApplicationWorkspace");
+    if (!wsClass) return NO;
+    id workspace = ((id (*)(id, SEL))objc_msgSend)(wsClass, sel_registerName("defaultWorkspace"));
+    if (!workspace) return NO;
+
+    // 注册字典（TrollStore uicache.m 键集逐一校准：SignatureVersion=@132352、
+    // SignerIdentity="Apple iPhone OS Application Signing" 等——CT 漏洞签名的
+    // 伪 Apple 平台签形态，lsd 据此按系统级签发处理）
+    BOOL registerAsUser = [appPath hasPrefix:@"/var/containers"] && !forceSystem;
+    NSMutableDictionary *dictToRegister = [NSMutableDictionary dictionary];
+    dictToRegister[@"ApplicationType"] = registerAsUser ? @"User" : @"System";
+    dictToRegister[@"CFBundleIdentifier"] = appBundleID;
+    dictToRegister[@"CodeInfoIdentifier"] = appBundleID;
+    dictToRegister[@"CompatibilityState"] = @0;
+    dictToRegister[@"IsContainerized"] = @YES;
+    if (containerPath) {
+        dictToRegister[@"Container"] = containerPath;
+        dictToRegister[@"EnvironmentVariables"] = @{
+            @"CFFIXED_USER_HOME" : containerPath,
+            @"HOME" : containerPath,
+            @"TMPDIR" : [containerPath stringByAppendingPathComponent:@"tmp"],
+        };
+    }
+    dictToRegister[@"IsDeletable"] = @YES;
+    dictToRegister[@"Path"] = appPath;
+    dictToRegister[@"SignerOrganization"] = @"Apple Inc.";
+    dictToRegister[@"SignatureVersion"] = @132352;
+    dictToRegister[@"SignerIdentity"] = @"Apple iPhone OS Application Signing";
+    dictToRegister[@"IsAdHocSigned"] = @YES;
+    dictToRegister[@"LSInstallType"] = @1;
+    dictToRegister[@"HasMIDBasedSINF"] = @0;
+    dictToRegister[@"MissingSINF"] = @0;
+    dictToRegister[@"FamilyID"] = @0;
+    dictToRegister[@"IsOnDemandInstallCapable"] = @0;
+
+    return ((BOOL (*)(id, SEL, NSDictionary *))objc_msgSend)(
+        workspace, sel_registerName("registerApplicationDictionary:"), dictToRegister);
+}
+
+// MARK: custom 法安装主体（TrollStore RootHelper/main.m installApp custom 分支同构）
+static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSString **outInstalledPath, NSError **error)
+{
+    NSError * (^fail)(NSString *) = ^NSError *(NSString *msg) {
+        return [NSError errorWithDomain:EUTrollEErrorDomain code:EUTrollEErrorCodePermasignInstallFailed
+                                userInfo:@{NSLocalizedDescriptionKey : msg}];
     };
-    int r = MIInstall(appBundlePath, @{@"CFBundleIdentifier" : @""},
-                      dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), cb, &miError);
-    if (r != 0) {
-        if (error) *error = miError ?: [NSError errorWithDomain:EUTrollEErrorDomain code:EUTrollEErrorCodePermasignInstallFailed
-                                                        userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"installd 安装返回 %d（CT 域校验未通过？检查 IPA 签名链）", r]}];
+
+    NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:
+        [appBundlePath stringByAppendingPathComponent:@"Info.plist"]];
+    NSString *appId = info[@"CFBundleIdentifier"];
+    if (![appId isKindOfClass:[NSString class]] || !appId.length) {
+        if (error) *error = fail(@"Info.plist 缺 CFBundleIdentifier");
         return NO;
     }
-    dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC));
-    if (!installSuccess) {
-        if (error) *error = [NSError errorWithDomain:EUTrollEErrorDomain code:EUTrollEErrorCodePermasignInstallFailed
-                                             userInfo:@{NSLocalizedDescriptionKey : installErrorDesc ?: @"installd 安装回调超时（30s）或未报告完成——视为失败，零残留"}];
+
+    // 1. Bundle 容器（MCMAppContainer：/var/containers/Bundle/Application/<UUID>）
+    void *mcm = dlopen("/System/Library/PrivateFrameworks/MobileContainerManager.framework/MobileContainerManager", RTLD_NOW);
+    if (!mcm) {
+        if (error) *error = fail(@"MobileContainerManager 私有框架加载失败");
         return NO;
     }
+    Class appContainerClass = NSClassFromString(@"MCMAppContainer");
+    if (!appContainerClass) {
+        if (error) *error = fail(@"MCMAppContainer 类缺失（系统 ABI 变更）");
+        return NO;
+    }
+    NSError *mcmError = nil;
+    id appContainer = ((id (*)(id, SEL, NSString *, BOOL, BOOL *, NSError **))objc_msgSend)(
+        appContainerClass,
+        sel_registerName("containerWithIdentifier:createIfNecessary:existed:error:"),
+        appId, YES, NULL, &mcmError);
+    if (!appContainer || mcmError) {
+        // entitlement 门禁首现点（containermanagerd XPC 查 entitlements）：
+        // B25-1 ➕ spike 三候选路线裁决中，失败信息保留 mcmError 供定位
+        if (error) *error = fail([NSString stringWithFormat:@"Bundle 容器创建失败（entitlement 门禁？spike 裁决中）：%@",
+                                  mcmError.localizedDescription ?: @"未知错误"]);
+        return NO;
+    }
+    id containerURL = ((id (*)(id, SEL))objc_msgSend)(appContainer, sel_registerName("url"));
+    NSString *bundleContainerPath = [containerURL path];
+    if (!bundleContainerPath.length) {
+        if (error) *error = fail(@"容器 URL 解析失败");
+        return NO;
+    }
+
+    // 2. 已装检测（TrollStore 171 同构语义：非本生态标记且容器非空 → 拒绝，防覆盖商店应用）
+    NSString *markerPath = [bundleContainerPath stringByAppendingPathComponent:@"_TrollStore"];
+    NSString *newAppBundlePath = [bundleContainerPath stringByAppendingPathComponent:appBundlePath.lastPathComponent];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if ([fm fileExistsAtPath:newAppBundlePath] && ![fm fileExistsAtPath:markerPath]) {
+        if (error) *error = fail(@"同 bundleID 应用已存在且非巨魔E/巨魔生态安装（拒绝覆盖，防破坏商店应用）");
+        return NO;
+    }
+    // 覆盖安装（更新）：先清旧 .app（进程已 root）
+    if ([fm fileExistsAtPath:newAppBundlePath]) {
+        [fm removeItemAtPath:newAppBundlePath error:nil];
+    }
+
+    // 3. 直拷 .app → Bundle 容器
+    NSError *copyError = nil;
+    if (![fm copyItemAtPath:appBundlePath toPath:newAppBundlePath error:&copyError]) {
+        if (error) *error = fail([NSString stringWithFormat:@".app 拷贝入容器失败：%@",
+                                  copyError.localizedDescription ?: @"未知错误"]);
+        return NO;
+    }
+
+    // 4. 写 `_TrollStore` 标记（容器根，空文件；TrollStore 生态识别语义，保持互认兼容）
+    if (![fm fileExistsAtPath:markerPath]) {
+        if (![[NSData data] writeToFile:markerPath options:0 error:nil]) {
+            if (error) *error = fail(@"`_TrollStore` 标记写入失败");
+            return NO;
+        }
+    }
+
+    // 5. 权限修正（两遍法：chown 33:33 → 目录/MachO 0755、其余 0644）
+    EUTrollEFixPermissionsOfAppBundle(newAppBundlePath);
+
+    // 6. 注册（LSApplicationWorkspace 注册字典）
+    if (!EUTrollERegisterAppPath(newAppBundlePath, NO)) {
+        // 注册失败回滚整个容器（TrollStore 181 同构：零残留）
+        [fm removeItemAtPath:bundleContainerPath error:nil];
+        if (error) *error = fail(@"LaunchServices 注册失败（lsd XPC entitlement 门禁？B25-1 ➕ spike 裁决中）");
+        return NO;
+    }
+
+    if (outInstalledPath) *outInstalledPath = newAppBundlePath;
+    if (error) *error = nil;
     return YES;
+}
+
+#pragma mark - jailed root 化（B25-1 ② 判修：iOS 17+ 直接内核写入版）
+
+/// 绕过 proc_ucred_update_content 的 17+ 分支——该分支走 target_proc_with_ucred：
+/// posix_spawn 一个 setuid-root 子进程（须实现 --fd/--uid argv 协议并向 fd 3 回写
+/// 新 ucred）再 proc_copy_ucred 拷回。Dopamine 语境子进程=launchdhook（越狱注入
+/// 产物），Engine B jailed 传入普通 sideload 二进制 → 17.0 域必死（B25-1 ②）。
+/// 本函数直接 kwrite 本进程 ucred：uid/svuid/svgid/groups[0] → 0 +
+/// task_tokens.audit_token 四字补丁（util.c:1107-1117 原样；≤16.6.1 域 Dopamine
+/// 15-16 同款直写实践，17.0 域可行性由本仓 proc_ro→ucred 解引用基础设施保证，
+/// kernel.c:46-55）。
+/// 前置 cr_ref==1：原地改共享 ucred 会污染共享者（内核态 UB 面），非 1 直接
+/// 失败保零残留（B25-1 评审要求）。
+static BOOL EUTrollEJailedRootify(uint64_t selfProc)
+{
+    if (selfProc == 0) return NO;
+    uint64_t ucred = proc_ucred(selfProc);
+    if (ucred == 0) return NO;
+
+    // 共享 ucred 拒改（kauth_cred 引用计数 >1 = 有其他进程共享，原地写=污染）
+    if (kread32(ucred + koffsetof(ucred, ref)) != 1) return NO;
+
+    // 四写：uid/svuid/svgid/groups[0] → 0（groups[0]=gid 0 即 root 语义；cr_ngroups
+    // 不动——B25-1 记化妆级瑕疵，不影响 root 判定）
+    kwrite32(ucred + koffsetof(ucred, svuid), 0);
+    kwrite32(ucred + koffsetof(ucred, uid), 0);
+    kwrite32(ucred + koffsetof(ucred, svgid), 0);
+    kwrite32(ucred + koffsetof(ucred, groups), 0);
+
+    // task_tokens.audit_token 四字补丁（17.0+ proc_ro 域必须：XPC 对端读的是
+    // audit token 而非实时 ucred，不补则 root 化对守护进程不可见）
+    if (gSystemInfo.kernelStruct.proc_ro.exists) {
+        uint64_t proc_ro = kread_ptr(selfProc + koffsetof(proc, proc_ro));
+        if (proc_ro != 0 && koffsetof(proc_ro, task_tokens)) {
+            uint64_t auditToken = proc_ro + koffsetof(proc_ro, task_tokens)
+                                + koffsetof(task_token_ro_data, audit_token);
+            kwrite32(auditToken + 4, 0);  // uid
+            kwrite32(auditToken + 8, 0);  // gid
+            kwrite32(auditToken + 12, 0); // ruid
+            kwrite32(auditToken + 16, 0); // rgid
+        }
+    }
+
+    return (getuid() == 0);
 }
 
 /// 引擎B 主流程：一次性漏洞会话（kfd KRW + dmaFail PPL）→ root → CT 永久签名装本体
@@ -505,8 +705,8 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
     if (![self eutrolle_deviceInCoreTrustDomain]) {
         NSOperatingSystemVersion v = [NSProcessInfo processInfo].operatingSystemVersion;
         NSString *hint = (v.majorVersion >= 17 && v.minorVersion >= 1) || v.majorVersion > 17
-            ? @"当前系统 CT 已修复：免越狱永久档不可达（16.6.1~18.7.1 可用越狱会话档；16.7b/RC/17.0 可用 PC 备份注入档）"
-            : @"16.7.x GA 系列 CT 已修复：免越狱永久档不可达（本版本可用越狱会话档兜底）";
+            ? @"当前系统 CT 已修复：免越狱永久档不可达（16.6.1~18.7.1 可用越狱会话档【实验性，实机验证未完成】；16.7b/RC/17.0 可用 PC 备份注入档）"
+            : @"16.7.x GA 系列 CT 已修复：免越狱永久档不可达（本版本可用越狱会话档兜底【实验性】）";
         if (error) *error = fail(EUTrollEErrorCodeDomainUnsupported, hint);
         return NO;
     }
@@ -522,7 +722,16 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
                                   [NSCharacterSet URLQueryAllowedCharacterSet]]];
             NSURL *url = [NSURL URLWithString:handoff];
             if (url) {
-                EUTrollEOpenURL(url);
+                // 此文件同时编译进 BaseBin/euphoria CLI（无 UIKit），
+                // 运行时解析 UIApplication，避免链接期缺符号（仅构建修复）
+                Class uiAppCls = NSClassFromString(@"UIApplication");
+                if (uiAppCls) {
+                    id app = ((id (*)(id, SEL))objc_msgSend)((id)uiAppCls, sel_registerName("sharedApplication"));
+                    if (app) {
+                        ((void (*)(id, SEL, NSURL *, NSDictionary *, id))objc_msgSend)(
+                            app, sel_registerName("openURL:options:completionHandler:"), url, @{}, nil);
+                    }
+                }
                 EUTrolleLog(@"巨魔E：本体在位，已移交安装 → %@", appURL.lastPathComponent);
                 if (error) *error = nil;
                 return YES;
@@ -559,14 +768,24 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
     // 注：纯 KRW（无 PPL）在 A12–A13 kfd 路线亦足以完成 ucred root 化；PPL 写仅在
     // 需要物理写路径时必备（dmaFail 优先带上，与越狱链同源）。
 
-    // ④ root 化（libjailbreak proc_ucred_update_content：iOS 17+ 含 audit token 修正路径）
+    // ④ root 化（B25-1 ② 判修：iOS 17+ 弃用 proc_ucred_update_content——其 17+ 分支
+    //    走 target_proc_with_ucred spawn setuid-root 子进程协议，jailed 语境无此
+    //    产物必死；≤16.x 维持原调用（else 分支=同款直接写，既有实践正确））
     uint64_t selfProc = proc_self();
-    gid_t rootGroups[1] = {0};
-    NSString *selfExec = [NSBundle mainBundle].executablePath;
-    if (selfProc == 0 || proc_ucred_update_content(selfProc, selfExec.fileSystemRepresentation,
-                                                    0, 0, 0, 0, rootGroups) != 0 || getuid() != 0) {
-        sessionFail(@"root 化失败（ucred 更新未生效）");
-        return NO;
+    if (@available(iOS 17.0, *)) {
+        if (!EUTrollEJailedRootify(selfProc)) {
+            sessionFail(@"root 化失败（17+ 直接内核写入未生效：ucred 共享或 kwrite 异常）");
+            return NO;
+        }
+    }
+    else {
+        gid_t rootGroups[NGROUPS_MAX] = {0}; // B25-1：原 [1] 长度传入后被按 NGROUPS_MAX 遍历 → 栈越界读（UB）
+        NSString *selfExec = [NSBundle mainBundle].executablePath;
+        if (selfProc == 0 || proc_ucred_update_content(selfProc, selfExec.fileSystemRepresentation,
+                                                        0, 0, 0, 0, rootGroups) != 0 || getuid() != 0) {
+            sessionFail(@"root 化失败（ucred 更新未生效）");
+            return NO;
+        }
     }
     EUTrolleLog(@"巨魔E：会话 root 就绪（uid=0）");
 
@@ -590,9 +809,11 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
         // staging 在成功路径上于⑥后清理；此处兜底防中途抛异常残留
     }
 
-    // ⑥ CT 永久签名安装（installd 路径）+ Persistence Helper 第二槽位
-    EUTrolleLog(@"巨魔E：永久签名安装（CT 域）…");
-    if (!EUTrollEPermasignInstall(appBundlePath, error)) {
+    // ⑥ CT 永久签名安装（B25-1 ③：custom 法——MCMAppContainer 直建容器+直拷+注册）
+    //   + Persistence Helper 第二槽位
+    EUTrolleLog(@"巨魔E：永久签名安装（CT 域，custom 法）…");
+    NSString *installedPath = nil;
+    if (!EUTrollEPermasignInstall(appBundlePath, &installedPath, error)) {
         [[NSFileManager defaultManager] removeItemAtPath:stagingDir error:nil];
         if (error && *error == nil) *error = fail(EUTrollEErrorCodePermasignInstallFailed, @"永久签名安装失败");
         sessionTeardown();
@@ -612,15 +833,9 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
     NSMutableString *cdhashHex = [NSMutableString string];
     for (int i = 0; i < CS_CDHASH_LEN; i++) [cdhashHex appendFormat:@"%02x", cdhash[i]];
 
-    // 安装后定位真实容器路径（installd 迁移后 .app 落 /var/containers/Bundle/Application/<UUID>/）
-    NSString *installedPath = appBundlePath;
+    // custom 法直接返回容器内落盘路径（/var/containers/Bundle/Application/<UUID>/
+    // <App>.app），原 installd 迁移后的 UUID 目录扫描已不需要
     NSString *bundleID = info[@"CFBundleIdentifier"] ?: appBundlePath.lastPathComponent;
-    NSString *containersRoot = @"/var/containers/Bundle/Application";
-    for (NSString *uuid in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:containersRoot error:nil]) {
-        NSString *candidate = [[containersRoot stringByAppendingPathComponent:uuid]
-                               stringByAppendingPathComponent:appBundlePath.lastPathComponent];
-        if ([[NSFileManager defaultManager] fileExistsAtPath:candidate]) { installedPath = candidate; break; }
-    }
 
     // Persistence Helper：同本体第二槽位安装（TrollStore 2"本体兼 helper"模式；
     // helper 负责 respring/图标缓存重载后的签名态恢复——C23 实证必要性）
@@ -659,7 +874,7 @@ static BOOL EUTrollEPermasignInstall(NSString *appBundlePath, NSError **error)
         NSString *helperApp = [helperDir stringByAppendingPathComponent:appBundlePath.lastPathComponent];
         if ([[NSFileManager defaultManager] createDirectoryAtPath:helperDir withIntermediateDirectories:YES attributes:nil error:nil]) {
             if ([[NSFileManager defaultManager] copyItemAtPath:appBundlePath toPath:helperApp error:nil]) {
-                EUTrollEPermasignInstall(helperApp, NULL); // CT 注册（失败不阻塞主流程；helper 缺失仅影响图标缓存重载自愈）
+                EUTrollEPermasignInstall(helperApp, NULL, NULL); // CT 注册（失败不阻塞主流程；helper 缺失仅影响图标缓存重载自愈）
                 NSMutableArray *entries = [[self installedApplications] mutableCopy];
                 [entries addObject:@{@"bundleID" : @"dev.euphoria.trolle.helper",
                                      @"path" : helperApp,

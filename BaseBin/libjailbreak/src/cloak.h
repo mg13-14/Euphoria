@@ -29,7 +29,19 @@ typedef struct {
 	bool hideMounts;        // filter jailbreak mounts from getfsstat/statfs
 	bool hideCredentials;   // mask elevated ucred/kinfo_proc/csops results
 	bool hideTrustcache;    // hide CS_DEBUGGED & friends from csops STATUS
-	uint64_t stealthLevel;  // 0 = paranoid (default), >0 = relaxed filters
+	// R38（用户 2026-08-29 11:41 定案）屏蔽软件双形态档位：
+	//   0 = 仅 jbroot/bind 隐藏（未启用形态时的兜底）
+	//   1 = 基础档（普通 roothide）：三 hide 全开，挂载白名单宽松
+	//   2 = 深档-过渡（getfsstat 白名单外挂载全隐，对齐 interpose 实现）
+	//   3 = 深档（rootful 态）：白名单外全隐（rootful 的 fakefs/overlay 六目录
+	//       挂载面大，检测面大，需最激进过滤）
+	// 语义=等级越高隐藏越深（原注释"0=paranoid"与 interpose 实现相反，已订正）
+	uint64_t stealthLevel;
+	// R40（用户 2026-08-29 17:00 定案）：黑名单制——屏蔽软件有黑名单，拉黑的 app
+	// 检测不到越狱环境；不在名单的 app（文件管理器等越狱生态工具）正常可见可管。
+	// true（默认）：cloak 过滤只对 aegis 名单内进程生效（名单外=信任态）；
+	// false：旧语义（除 root/受信外全隐藏，R40 前的行为，留作兜底开关）。
+	bool blacklistMode;
 } cloak_policy_t;
 
 typedef struct {

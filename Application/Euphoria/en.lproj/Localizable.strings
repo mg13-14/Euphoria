@@ -1,4 +1,4 @@
-"Credits_Made_By" = "by opa334, ElleKit by évelyne";
+"Credits_Made_By" = "by Team Euphoria · Special thanks to mg13-14 & AI (GLM-4-Plus/Z.ai)";
 
 // Log
 "Status_Title_Jailbreaking" = "Jailbreaking";
@@ -127,3 +127,21 @@
 "Continue" = "Continue";
 "Credits_Special_Thanks" = "Special Thanks";
 "Credits_AI_Assistance" = "AI Assistance";
+
+/* Rootful (T15) & Aegis (R27 restored, user 08-28) */
+"Section_Rootful" = "Rootful";
+"Rootful_Mode" = "Rootful Mode";
+"Rootful_Mode_Footer" = "On supported devices (A12/A13, iOS 16.6.1–18.7.1). First activation may take several minutes. Disabling keeps the volume and data.";
+"Button_Purge_Rootful" = "Erase Rootful Volume";
+"Alert_Purge_Rootful_Title" = "Erase Rootful Volume";
+"Alert_Purge_Rootful_Body" = "This uninstalls the rootful overlay, destroys the volume and clears its state. This cannot be undone. Continue?";
+"Hide_Jailbreak_Apps" = "Hide Jailbreak Apps";
+"Hide_Jailbreak_Apps_Footer" = "Hides the Euphoria app icon via Aegis shield policy. Use Spotlight or Settings to find it again while hidden.";
+"Hide_Jailbreak_Traces" = "Hide Jailbreak Traces";
+"Hide_Jailbreak_Traces_Footer" = "System-level concealment via Cloak: hides jailbreak mounts, credentials and trust cache (roothide style). Reboot recommended after toggling.";
+// R36 hide jailbreak (rootless)
+"Hide_Jailbreak" = "Hide Jailbreak";
+"Hide_Jailbreak_Footer" = "Hides the Euphoria icon from the Home Screen. Find it again via Spotlight search (same behavior as Dopamine).";
+// R37 roothide mode
+"Roothide_Mode" = "Roothide Mode";
+"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";

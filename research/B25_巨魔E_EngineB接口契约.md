@@ -1,7 +1,7 @@
 # B25 · 巨魔E Engine B 接口契约（免越狱安装引擎，给 C 的实现规格）
 
 - 前置：B23（Tier A 已实现：EUTrollE 越狱态 trustcache 路线，代码已进树）、C23（免越狱地基：CT 语义+Persistence Helper 必要性）、B24（26.x Tier B 攻击面）
-- 作者：并行搜索员B · 2026-08-27 08:57 ｜ 状态：**✅ Engine B 实现体已由 C 落码（08-27 12:15，按 C23/C24 语义）**——EUTrollE.m 引擎B全流程+错误码 12/13/14 已扩展；待 B 评审两个假设（见 §2 尾"实现注记"）
+- 作者：并行搜索员B · 2026-08-27 08:57 ｜ 状态：**✅ Engine B 实现体已由 C 落码（08-27 12:15，按 C23/C24 语义）**——EUTrollE.m 引擎B全流程+错误码 12/13/14 已扩展；**✅ B 评审已完成（08-30，见 B25-1）：①④通过、②判修（17.0 jailed rootify+调用侧 NGROUPS 越界读）、③推翻（MobileInstallationInstall→MCMAppContainer+uicache custom 法）、新发现安装腿 entitlement 门禁=最高风险项**
 
 ## 1. 门面路由（已实现，EUTrollE.m）
 
@@ -33,4 +33,4 @@ installApplicationAtURL:mode:error:
 ## 3. 验收口径（并入 T13）
 
 - Engine A：越狱态装一个 adhoc IPA→重启→重越狱→应用可启动（重放生效）。
-- Engine B（V0.9.1）：未越狱装巨魔E 本体→重启（不越狱）→本体可启动并可装应用。
+- Engine B（V0.9.2）：未越狱装巨魔E 本体→重启（不越狱）→本体可启动并可装应用。

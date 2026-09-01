@@ -8,11 +8,11 @@
 		<key>name</key>
 		<string>Euphoria</string>
 		<key>image</key>
-		<string>Background_Green.jpg</string>
+		<string>Background_EU</string>
 		<key>actionMenuColor</key>
-		<string>723f3f3f</string>
+		<string>72EB4F9D</string>
 		<key>windowColor</key>
-		<string>994c4c4c</string>
+		<string>995A2B8D</string>
 		<key>blur</key>
 		<integer>18</integer>
 		<key>titleShadow</key>

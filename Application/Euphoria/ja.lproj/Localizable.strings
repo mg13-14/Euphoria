@@ -1,4 +1,4 @@
-"Credits_Made_By" = "by opa334, ElleKit by évelyne";
+"Credits_Made_By" = "Team Euphoria 製 · mg13-14 と GLM-4-Plus/Z.ai に特別感謝";
 
 // Log
 "Status_Title_Jailbreaking" = "Jailbreaking";
@@ -129,3 +129,9 @@
 "Select_Package_Managers_Install_Message" = "どちらを選択するか迷った場合は、Sileoを選択することをおすすめします。";
 "Continue" = "続行";
 
+// R36 hide jailbreak (rootless)
+"Hide_Jailbreak" = "Hide Jailbreak";
+"Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+// R37 roothide mode
+"Roothide_Mode" = "Roothide Mode";
+"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";

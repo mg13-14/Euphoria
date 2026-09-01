@@ -1,4 +1,4 @@
-"Credits_Made_By" = "por opa334, ElleKit por évelyne";
+"Credits_Made_By" = "by Team Euphoria · Special thanks to mg13-14 & AI (GLM-4-Plus/Z.ai)";
 
 // Registro
 "Status_Title_Jailbreaking" = "Realizando jailbreak";
@@ -129,3 +129,9 @@
 "Status_Title_Select_Package_Managers" = "Selecciona gestor(es) de paquetes";
 "Select_Package_Managers_Install_Message" = "Si no estás seguro de cuál elegir, selecciona Sileo";
 "Continue" = "Continuar";
+// R36 hide jailbreak (rootless)
+"Hide_Jailbreak" = "Hide Jailbreak";
+"Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+// R37 roothide mode
+"Roothide_Mode" = "Roothide Mode";
+"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";

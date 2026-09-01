@@ -170,6 +170,22 @@ int csops_hook(pid_t pid, unsigned int ops, void *useraddr, size_t usersize)
 			uint32_t* csflag = (uint32_t *)useraddr;
 			*csflag |= CS_VALID;
 			*csflag &= ~CS_DEBUGGED;
+			// R38（用户 2026-08-29 11:41）屏蔽软件双形态——深档（rootful 态，
+			// cloak hideTrustcache 开）时 CS_GET_TASK_ALLOW 一并抹除（反检测 SDK
+			// 常用位）；基础档/未启用不抹（部分正常 App 也带此位，过度抹除易反指纹）。
+			// R38-bis（A 11:49 集成重评验收）：data-only 链（ucred patch+cs_flags 翻转）
+			// 不碰 trustcache——hideTrustcache 在 Form-B 下空转（无害但无效）；
+			// 新暴露向量=翻转后的 flags 位序列与干净设备不一致。L3 最终形态=
+			// "序列还原"（呈现完整正常 flags 序列而非位掩码，防按位组合指纹比对）
+			// +AMFI 策略位呈现——S2 执行层重写时随 Form-B 六面重构（本 hook 的
+			// 位掩码实现作为过渡档保留）。验收标准：翻转后进程检测面呈现与干净
+			// 设备逐位一致。
+			{
+				extern cloak_policy_cache_t gCloakPolicy;
+				if (gCloakPolicy.hideTrustcache) {
+					*csflag &= ~CS_GET_TASK_ALLOW;
+				}
+			}
 			if (pid == getpid() && gFullyDebugged) {
 				*csflag |= CS_DEBUGGED;
 			}
@@ -474,8 +490,14 @@ __attribute__((constructor)) static void initializer(void)
 		// On arm64, writing to executable pages removes CS_VALID from the csflags of the process
 		// These hooks are neccessary to get the system to behave with this (since multiple system APIs check for CS_VALID and produce failures if it's not set)
 		// They are ugly but needed
-		litehook_hook_function(csops, csops_hook);
 		litehook_hook_function(csops_audittoken, csops_audittoken_hook);
+#endif
+		// R38（用户 2026-08-29 11:41）：csops_hook 提出条件编译外——arm64e（A12+）
+		// 深档（rootful 态 cloak hideTrustcache 开）也要 CS_GET_TASK_ALLOW 抹除；
+		// CS_VALID 保活分支在 arm64e 上无害（写与不写等价）。
+		litehook_hook_function(csops, csops_hook);
+#ifndef __arm64e__
+		// (arm64-only NEC/PAC block continues)
 		if (__builtin_available(iOS 16.0, *)) {
 			litehook_hook_function(necp_match_policy, necp_match_policy_hook);
 			litehook_hook_function(necp_open, necp_open_hook);

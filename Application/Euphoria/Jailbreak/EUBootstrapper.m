@@ -10,12 +10,17 @@
 #import "EUEnvironmentManager.h"
 #import "EUUIManager.h"
 #import "EUTrollE.h"
+#import "EUPreferenceManager.h"
 #import <libjailbreak/info.h>
 #import <libjailbreak/util.h>
 #import <libjailbreak/jbclient_xpc.h>
 #import <sys/mount.h>
 #import <dlfcn.h>
 #import <sys/stat.h>
+#import <libproc.h>
+#import <signal.h>
+#import <unistd.h>
+extern char **environ;
 #import "NSString+Version.h"
 
 #define LIBKRW_EUPHORIA_BUNDLED_VERSION @"2.0.3"
@@ -510,13 +515,40 @@ NSString *const bootstrapErrorDomain = @"BootstrapErrorDomain";
 // （实测：Procursus bootstrap tar 与 sileo/zebra deb 均不带源条目、不写源；
 //  roothide 镜像 suite=iphoneos-arm64e/<bootstrap代数>，{BOOTSTRAP} 占位符
 //  由 writePresetSources 以 [self bootstrapVersion] 实时替换。）
+// R14 三模式源清单（用户 08-28 10:17/10:24 裁定）：plist 顶层 dict
+//   Mode-Rootless = 原版 Dopamine 五源+EU 槽（rootful 复用本清单——用户定案）
+//   Mode-Roothide = roothide 参照系六源+EU 槽（B20 §1）
+// 模式判定：本地偏好 rootfulUserEnabled（与设置页开关同键）——
+//   false（默认）→ roothide 模式；true → rootful（复用 rootless 清单）。
+// 兼容：顶层为 array（旧结构）时原样返回（roothide 单集），不崩。
 - (NSArray*)presetSources
 {
     static NSArray *sources = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSString *path = [[NSBundle mainBundle] pathForResource:@"PresetSources" ofType:@"plist"];
-        sources = path ? [NSArray arrayWithContentsOfFile:path] : @[];
+        id root = path ? [NSDictionary dictionaryWithContentsOfFile:path] : nil;
+        if (!root) {
+            sources = path ? [NSArray arrayWithContentsOfFile:path] ?: @[] : @[];
+            return;
+        }
+        // 三态裁定（用户 08-28 10:27/08-29 00:11）：roothide/rootful 都没勾=默认 rootless；
+        // rootful 勾选=捆绑 roothide（开 rootful 自动开 roothide，关 roothide 则强制关 rootful）
+        // 且源集复用 rootless 清单（用户 10:17"Rootful 则是 rootless 的越狱源"）。
+        BOOL rootful = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"rootfulUserEnabled" fallback:NO];
+        BOOL roothide = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"roothideUserEnabled" fallback:NO];
+        // 源单只分两集：Mode-Roothide（roothide 单开）vs Mode-Rootless（rootless 默认+rootful 复用）
+        NSString *modeKey = (roothide && !rootful) ? @"Mode-Roothide" : @"Mode-Rootless";
+        NSArray *list = root[modeKey];
+        if (![list isKindOfClass:[NSArray class]]) {
+            // 防御：无该模式段时回退另一段，再回退空
+            list = root[(roothide && !rootful) ? @"Mode-Rootless" : @"Mode-Roothide"];
+            if (![list isKindOfClass:[NSArray class]]) list = @[];
+        }
+        sources = list;
+        [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:
+            @"PresetSources: %@ 清单 %tu 条（rootful=%d roothide=%d）",
+            modeKey, sources.count, rootful, roothide] debug:YES];
     });
     return sources;
 }
@@ -554,6 +586,10 @@ static void EUSetSourceFileImmutable(NSString *path, BOOL immutable)
     [fm removeItemAtPath:[sourcesDir stringByAppendingPathComponent:@"default.sources"] error:nil];
 
     for (NSDictionary *source in [self presetSources]) {
+        // EU 占位槽：URL 为空=域名未定（R17），跳过不写死链——定案后单点填入即激活
+        NSString *rawURL = source[@"URL"];
+        if (![rawURL isKindOfClass:[NSString class]] || rawURL.length == 0) continue;
+
         NSString *fileName = [NSString stringWithFormat:@"%@.list", source[@"Key"]];
         NSString *filePath = [sourcesDir stringByAppendingPathComponent:fileName];
         // 层2：先解锁再删再写（immutable 状态下 unlink/rename 会 EPERM）
@@ -685,7 +721,43 @@ static void EUSetSourceFileImmutable(NSString *path, BOOL immutable)
 {
     NSError *error = [self ensurePrivatePrebootIsWritable];
     if (error) return error;
-    NSString *path = [[NSString stringWithUTF8String:gSystemInfo.jailbreakInfo.rootPath] stringByDeletingLastPathComponent];
+
+    // R34（用户 00:19"移除越狱按钮被吃掉了吗"补强——B 侧卸载后端，A 最小路径）：
+    // 删文件前先把 var/jb 守护进程停干净，避免运行中守护在删树后继续写文件/重创目录，
+    // 以及 launchd 对已删 plist 的注册残留。调用方（EUEnvironmentManager deleteBootstrap）
+    // 已用 runAsRoot+runUnsandboxed 包裹，本函数体内即 root 上下文。
+    // 顺序：枚举 /var/jb/Library/LaunchDaemons → launchctl bootout → 杀 jbroot 进程 → 删树。
+    NSString *jbRoot = [NSString stringWithUTF8String:gSystemInfo.jailbreakInfo.rootPath];
+    NSString *daemonsDir = @"/var/jb/Library/LaunchDaemons";
+    NSArray *daemonPlists = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:daemonsDir error:nil];
+    for (NSString *plistName in daemonPlists) {
+        if (![plistName.pathExtension isEqualToString:@"plist"]) continue;
+        NSString *label = [plistName stringByDeletingPathExtension];
+        // launchctl bootout system/<label>（失败不阻断：守护进程可能本就没在跑）
+        pid_t pid = fork();
+        if (pid == 0) {
+            const char *bootoutArg = [[NSString stringWithFormat:@"system/%@", label] UTF8String];
+            const char *launchctl = JBROOT_PATH("/usr/bin/launchctl");
+            execve(launchctl, (char *[]){(char *)"launchctl", (char *)"bootout", (char *)bootoutArg, NULL}, environ);
+            _exit(127);
+        }
+        int status = 0;
+        waitpid(pid, &status, 0);
+    }
+    // 杀残留的 jbroot 进程（basebin 守护/插件进程；按可执行路径前缀匹配，root 上下文直接 kill）
+    {
+        size_t jbRootLen = strlen(JBROOT_PATH("/"));
+        for (pid_t p = 1; p < 40000; p++) {
+            char pathBuf[PATH_MAX] = {0};
+            if (proc_pidpath(p, pathBuf, PATH_MAX) > 0) {
+                if (strncmp(pathBuf, JBROOT_PATH("/"), jbRootLen) == 0) {
+                    kill(p, SIGKILL);
+                }
+            }
+        }
+    }
+
+    NSString *path = [jbRoot stringByDeletingLastPathComponent];
     [[NSFileManager defaultManager] removeItemAtPath:path error:&error];
     if (error) return error;
     [[NSFileManager defaultManager] removeItemAtPath:@"/var/jb" error:nil];

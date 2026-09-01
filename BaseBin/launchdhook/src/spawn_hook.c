@@ -175,11 +175,7 @@ int __posix_spawn_hook(pid_t *restrict pid, const char *restrict path,
 		if (!strcmp(path, "/usr/libexec/xpcproxy")) {
 			if (argv[0]) {
 				if (argv[1]) {
-					size_t labelLen = strlen(argv[1]);
-					if (labelLen > 0 && argv[1][labelLen-1] == '\n') labelLen--;
-					static const char backboarddLabel[] = "com.apple.backboardd";
-					if ((labelLen == sizeof(backboarddLabel) - 1) &&
-						(!strncmp(argv[1], backboarddLabel, labelLen))) {
+					if (!strcmp(argv[1], "com.apple.backboardd\n")) {
 						free_boot_logo();
 						gFreeBootLogoBeforeBackboardd = false;
 					}

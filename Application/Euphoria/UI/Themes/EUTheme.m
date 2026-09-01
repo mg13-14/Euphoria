@@ -47,32 +47,39 @@
 
 - (UIImage *)generateBootLogo
 {
-    // The boot logo is the app icon, centered on a black background
-    UIImage *appIcon = [UIImage imageNamed:@"AppIconImage"];
-    UIImage *overlayImage = appIcon ?: [UIImage imageNamed:@"EuphoriaLogo"];
-
-    CGSize canvasSize = CGSizeMake(2000, 2000);
-    CGSize overlaySize = CGSizeMake(380, 380);
-    CGPoint overlayOrigin = CGPointMake((canvasSize.width - overlaySize.width) / 2.0,
-                                        (canvasSize.height - overlaySize.height) / 2.0);
+    // R35（用户 10:17-10:18 定案，"中间放个小图标，四周那些黑留给谁看"
+    // +"把上面的那个标志去掉"+"直接让它变成应用图标，那个颜色就行了"）：
+    // 旧实现=主题背景图(3000×2000 横图)+固定 350×350 EuphoriaLogo——横图在竖屏
+    // 开机阶段等比缩放后四周黑边，且 350pt 小标志占比过小。
+    // 新实现：竖屏全屏画布（1179×2556），背景=主应用图标背景板同款渐变
+    // （#5A2B8D→#EB4F9D，主 AppIcon 中心列实测），中央=应用图标本体
+    // （EUBootIcon，非 EuphoriaLogo 标志）放大至画布宽 50%；黑边来源根除。
+    CGSize canvasSize = CGSizeMake(1179, 2556);
+    UIImage *appIconImage = [UIImage imageNamed:@"EUBootIcon"];
 
     UIGraphicsBeginImageContextWithOptions(canvasSize, YES, 1.0);
+    CGContextRef ctx = UIGraphicsGetCurrentContext();
 
-    [[UIColor blackColor] setFill];
-    UIRectFill(CGRectMake(0, 0, canvasSize.width, canvasSize.height));
+    // 应用图标背景板渐变（上 #5A2B8D → 下 #EB4F9D）
+    CGFloat *components = (CGFloat []) {0x5A/255.0, 0x2B/255.0, 0x8D/255.0, 1.0,
+                                         0xEB/255.0, 0x4F/255.0, 0x9D/255.0, 1.0};
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGGradientRef gradient = CGGradientCreateWithColorComponents(space, components, NULL, 2);
+    CGContextDrawLinearGradient(ctx, gradient, CGPointZero, CGPointMake(0, canvasSize.height), 0);
+    CGGradientRelease(gradient);
+    CGColorSpaceRelease(space);
 
-    if (appIcon) {
-        // Clip to a rounded rect so the icon looks like it does on the home screen
-        UIBezierPath *clipPath = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(overlayOrigin.x, overlayOrigin.y, overlaySize.width, overlaySize.height)
-                                                             cornerRadius:overlaySize.width * 0.2237];
-        [clipPath addClip];
+    // 应用图标本体居中（宽 50%，等比；无资源时纯渐变全屏，不留黑不留标志）
+    if (appIconImage) {
+        CGFloat iconWidth = canvasSize.width * 0.5;
+        CGFloat iconHeight = iconWidth * appIconImage.size.height / appIconImage.size.width;
+        CGFloat ox = (canvasSize.width - iconWidth) / 2.0;
+        CGFloat oy = (canvasSize.height - iconHeight) / 2.0;
+        [appIconImage drawInRect:CGRectMake(ox, oy, iconWidth, iconHeight)];
     }
-
-    [overlayImage drawInRect:CGRectMake(overlayOrigin.x, overlayOrigin.y, overlaySize.width, overlaySize.height)];
 
     UIImage *finalImage = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
-
     return finalImage;
 }
 

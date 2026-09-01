@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "AppIconImage.png",
+      "filename" : "booticon.png",
       "idiom" : "universal",
       "scale" : "1x"
     },

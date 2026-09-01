@@ -12,6 +12,7 @@ xpc_object_t cloak_policy_serialize(const cloak_policy_t *policy)
 	xpc_dictionary_set_bool(xdict, "hideCredentials", policy->hideCredentials);
 	xpc_dictionary_set_bool(xdict, "hideTrustcache", policy->hideTrustcache);
 	xpc_dictionary_set_uint64(xdict, "stealthLevel", policy->stealthLevel);
+	xpc_dictionary_set_bool(xdict, "blacklistMode", policy->blacklistMode); // R40
 	return xdict;
 }
 
@@ -24,6 +25,7 @@ void cloak_policy_deserialize(xpc_object_t xdict, cloak_policy_t *policy)
 	policy->hideCredentials  = xpc_dictionary_get_bool(xdict, "hideCredentials");
 	policy->hideTrustcache   = xpc_dictionary_get_bool(xdict, "hideTrustcache");
 	policy->stealthLevel     = xpc_dictionary_get_uint64(xdict, "stealthLevel");
+	policy->blacklistMode    = xpc_dictionary_get_bool(xdict, "blacklistMode"); // R40（缺省 false=旧语义，向后兼容）
 }
 
 int cloak_get_policy(cloak_policy_t *policyOut)
@@ -40,6 +42,7 @@ int cloak_get_policy(cloak_policy_t *policyOut)
 		policyOut->hideCredentials = xpc_dictionary_get_bool(xreply, "hideCredentials");
 		policyOut->hideTrustcache  = xpc_dictionary_get_bool(xreply, "hideTrustcache");
 		policyOut->stealthLevel    = xpc_dictionary_get_uint64(xreply, "stealthLevel");
+		policyOut->blacklistMode   = xpc_dictionary_get_bool(xreply, "blacklistMode"); // R40
 	}
 	xpc_release(xreply);
 	return result;

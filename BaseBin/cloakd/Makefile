@@ -8,7 +8,7 @@ LDFLAGS = -lbsm -L../.build -ljailbreak -framework CoreFoundation -framework IOK
 sign: $(TARGET)
 	@ldid -Cadhoc -Sentitlements.plist $<
 
-$(TARGET): $(wildcard src/*.c)
+$(TARGET): $(wildcard src/*.c) ../libjailbreak/src/jbclient_xpc.c ../libjailbreak/src/jbclient_mach.c ../libjailbreak/src/cloak.c ../libjailbreak/src/inline_svc.c ../libjailbreak/src/util.c ../libjailbreak/src/jbroot.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:

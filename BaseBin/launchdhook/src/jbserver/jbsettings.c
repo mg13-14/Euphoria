@@ -31,6 +31,11 @@ int jbsettings_get(const char *key, xpc_object_t *valueOut)
 		*valueOut = xpc_bool_create(jbsetting(cloakHideTrustcache));
 		return 0;
 	}
+	// R40: cloak blacklist mode (see info.h jailbreakSettings.cloakBlacklistMode)
+	else if (!strcmp(key, "cloakBlacklistMode")) {
+		*valueOut = xpc_bool_create(jbsetting(cloakBlacklistMode));
+		return 0;
+	}
 	else if (!strcmp(key, "cloakStealthLevel")) {
 		*valueOut = xpc_uint64_create(jbsetting(cloakStealthLevel));
 		return 0;
@@ -47,6 +52,11 @@ int jbsettings_get(const char *key, xpc_object_t *valueOut)
 	// Euphoria rootful user toggle (App Settings UI)
 	else if (!strcmp(key, "rootfulUserEnabled")) {
 		*valueOut = xpc_bool_create(jbsetting(rootfulUserEnabled));
+		return 0;
+	}
+	// R37: roothide independent user toggle (see info.h jailbreakSettings)
+	else if (!strcmp(key, "roothideUserEnabled")) {
+		*valueOut = xpc_bool_create(jbsetting(roothideUserEnabled));
 		return 0;
 	}
 	// Read-only: whether this device sits inside the rootful matrix
@@ -86,6 +96,11 @@ int jbsettings_set(const char *key, xpc_object_t value)
 		gSystemInfo.jailbreakSettings.cloakHideTrustcache = xpc_bool_get_value(value);
 		return 0;
 	}
+	// R40: cloak blacklist mode
+	else if (!strcmp(key, "cloakBlacklistMode") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+		gSystemInfo.jailbreakSettings.cloakBlacklistMode = xpc_bool_get_value(value);
+		return 0;
+	}
 	else if (!strcmp(key, "cloakStealthLevel") && xpc_get_type(value) == XPC_TYPE_UINT64) {
 		gSystemInfo.jailbreakSettings.cloakStealthLevel = xpc_uint64_get_value(value);
 		return 0;
@@ -102,6 +117,22 @@ int jbsettings_set(const char *key, xpc_object_t value)
 	// Euphoria rootful user toggle (App Settings UI)
 	else if (!strcmp(key, "rootfulUserEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
 		gSystemInfo.jailbreakSettings.rootfulUserEnabled = xpc_bool_get_value(value);
+		// R37（用户 00:11 定案）：开 rootful 自动捆绑 roothide
+		if (gSystemInfo.jailbreakSettings.rootfulUserEnabled) {
+			gSystemInfo.jailbreakSettings.roothideUserEnabled = true;
+		}
+		// 关 roothide 时 rootful 锁死（服务端兜底，UI 联动之外的保底）
+		if (!gSystemInfo.jailbreakSettings.roothideUserEnabled) {
+			gSystemInfo.jailbreakSettings.rootfulUserEnabled = false;
+		}
+		return 0;
+	}
+	// R37: roothide independent toggle — turning it off force-disables rootful
+	else if (!strcmp(key, "roothideUserEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+		gSystemInfo.jailbreakSettings.roothideUserEnabled = xpc_bool_get_value(value);
+		if (!gSystemInfo.jailbreakSettings.roothideUserEnabled) {
+			gSystemInfo.jailbreakSettings.rootfulUserEnabled = false;
+		}
 		return 0;
 	}
 	return -1;

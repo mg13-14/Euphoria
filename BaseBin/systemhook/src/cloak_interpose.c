@@ -3,8 +3,11 @@
 #include "common/private.h"
 
 #include <libjailbreak/cloak.h>
+#include <libjailbreak/aegis.h>       // R40: aegis_get_policy（黑名单匹配）
 #include <libjailbreak/jbroot.h>
 #include <libjailbreak/util.h>
+#include <libjailbreak/jbclient_xpc.h> // R40: jbclient_jbsettings_get_bool
+#include <libproc.h>                    // R40: proc_pidpath
 
 #include <errno.h>
 #include <string.h>
@@ -29,6 +32,41 @@ static char gBindMountPoint[MAXPATHLEN] = { 0 };
 /* Policy                                                                    */
 /* ------------------------------------------------------------------------ */
 
+// R40：本进程是否在 aegis 屏蔽名单（黑名单）内。
+// 匹配逻辑与 systemhook/src/aegis_interpose.c 的 aegis_process_matches_list
+// 保持一致（弹性匹配：二进制名/.app 目录名/bundle id/路径子串）——该文件由
+// root 属主维护，此处内联一份以解耦，改匹配规则时两处同步。
+static bool cloak_process_on_aegis_list(void)
+{
+        aegis_policy_t aegisPolicy = { 0 };
+        if (aegis_get_policy(&aegisPolicy) != 0) return false;
+        if (!aegisPolicy.enabled || aegisPolicy.appCount == 0) return false;
+
+        char execPath[MAXPATHLEN] = { 0 };
+        if (proc_pidpath(getpid(), execPath, sizeof(execPath)) <= 0) return false;
+
+        char pathCopy[MAXPATHLEN];
+        strlcpy(pathCopy, execPath, sizeof(pathCopy));
+        const char *base = strrchr(pathCopy, '/');
+        base = base ? base + 1 : pathCopy;
+        char *appMarker = strstr(pathCopy, ".app/");
+        const char *bundleDir = NULL;
+        if (appMarker) {
+                *appMarker = '\0';
+                const char *slash = strrchr(pathCopy, '/');
+                bundleDir = slash ? slash + 1 : pathCopy;
+        }
+
+        for (uint32_t i = 0; i < aegisPolicy.appCount; i++) {
+                const char *entry = aegisPolicy.appBundleIds[i];
+                if (!entry || !entry[0]) continue;
+                if (strcmp(entry, base) == 0) return true;
+                if (bundleDir && strcmp(entry, bundleDir) == 0) return true;
+                if (strstr(execPath, entry) != NULL) return true;
+        }
+        return false;
+}
+
 static void cloak_reload_policy(void)
 {
         cloak_policy_t policy = { 0 };
@@ -38,6 +76,9 @@ static void cloak_reload_policy(void)
                 gCloakPolicy.hideCredentials = policy.enabled && policy.hideCredentials;
                 gCloakPolicy.hideTrustcache  = policy.enabled && policy.hideTrustcache;
                 gCloakPolicy.stealthLevel    = policy.stealthLevel;
+                // R40：GET_POLICY 表满 8 参装不下 blacklistMode——走 jbsettings 独立键。
+                // 未越狱/读取失败=false（旧语义兜底，不阻断既有隐藏）。
+                gCloakPolicy.blacklistMode   = jbclient_jbsettings_get_bool("cloakBlacklistMode");
         }
 }
 
@@ -50,6 +91,15 @@ bool cloak_process_is_trusted(void)
         char execPath[MAXPATHLEN] = { 0 };
         uint32_t execPathLen = sizeof(execPath);
         if (_NSGetExecutablePath(execPath, &execPathLen) != 0) return false;
+
+        // R40（用户 2026-08-29 17:00 定案）黑名单制：不在 aegis 名单上的进程
+        // 一律信任——文件管理器等越狱生态工具靠越狱/巨魔提权工作（用户原话
+        // "他就是靠越狱和巨魔来提升管理器权限"），屏蔽它们等于废掉它们；
+        // 只有被拉黑的 app（检测越狱的那些）才吃过滤视图。
+        // blacklistMode=false 时维持 R40 前旧语义（非受信全隐藏，兜底开关）。
+        if (gCloakPolicy.blacklistMode && !cloak_process_on_aegis_list()) {
+                return true;
+        }
 
         // System daemons and binaries are trusted.
         static const char *trustedPrefixes[] = {
@@ -152,8 +202,12 @@ static void cloak_scrub_kinfo_proc(struct kinfo_proc *kproc)
                 if (hide) {
                         kproc->kp_eproc.e_ucred.cr_uid  = 501;
                         kproc->kp_eproc.e_ucred.cr_gid  = 501;
+                        kproc->kp_eproc.e_ucred.cr_ruid = 501;
+                        kproc->kp_eproc.e_ucred.cr_rgid = 501;
                         kproc->kp_eproc.e_pcred.p_ruid  = 501;
                         kproc->kp_eproc.e_pcred.p_rgid  = 501;
+                        kproc->kp_eproc.e_ucred.cr_svuid = 501;
+                        kproc->kp_eproc.e_ucred.cr_svgid = 501;
                         // A stock system process never carries all-zero groups.
                         kproc->kp_eproc.e_ucred.cr_ngroups = 1;
                         for (int g = 1; g < NGROUPS; g++) {
@@ -164,7 +218,8 @@ static void cloak_scrub_kinfo_proc(struct kinfo_proc *kproc)
         }
 }
 
-int sysctl_hook(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
+
+int sysctl_hook(const char *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 {
         int r = sysctl(name, namelen, oldp, oldlenp, newp, newlen);
         if (r != 0) return r;
@@ -177,6 +232,10 @@ int sysctl_hook(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *new
                 int entrySize = 0;
                 switch (name[2]) {
                         case KERN_PROC_PID:
+                        case KERN_PROC_PIDINFO:
+                        case KERN_PROC_TBSDINFO:
+                                entrySize = (int)sizeof(struct kinfo_proc);
+                                break;
                         case KERN_PROC_ALL:
                         case KERN_PROC_UID:
                                 entrySize = (int)sizeof(struct kinfo_proc);
