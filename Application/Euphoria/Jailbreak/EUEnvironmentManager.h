@@ -58,6 +58,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)respring;
 - (void)rebootUserspace;
+// 构建修复：.m 已有实现但头文件漏声明，EUSettingsController 调用处报
+// "no visible @interface declares the selector"
+- (int)spawnJbctlAsRootWithArgs:(NSArray *)args;
 - (void)rebuildIconCache;
 - (void)refreshJailbreakApps;
 - (void)reboot;

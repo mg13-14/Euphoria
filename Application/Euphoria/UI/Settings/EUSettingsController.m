@@ -353,10 +353,11 @@
                     // 复用 aegis 同一后端（jbctl aegis add/remove dev.euphoria.Euphoria），
                     // 文案键按 Dopamine 惯例叫"Hide Jailbreak"。
                     PSSpecifier *hideJbSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Hide_Jailbreak") target:self set:@selector(setAegisHidden:specifier:) get:@selector(readAegisHidden:) detail:nil cell:PSSwitchCell edit:nil];
-                    [h[hideJbSpecifier setProperty:@YES forKey:@"enabled"];
-                    [h[hideJbSpecifier setProperty:@"jailbreakHidden" forKey:@"key"];
-                    [h[hideJbSpecifier setProperty:@NO forKey:@"default"];
-                    [h[hideJbSpecifier setProperty:EULocalizedString(@"Hide_Jailbreak_Footer") forKey:@"footer"];
+                    // 构建修复：去除误入的 "[h" 残留前缀（损坏的消息发送语法）
+                    [hideJbSpecifier setProperty:@YES forKey:@"enabled"];
+                    [hideJbSpecifier setProperty:@"jailbreakHidden" forKey:@"key"];
+                    [hideJbSpecifier setProperty:@NO forKey:@"default"];
+                    [hideJbSpecifier setProperty:EULocalizedString(@"Hide_Jailbreak_Footer") forKey:@"footer"];
                     [specifiers addObject:hideJbSpecifier];
                 }
 
