@@ -22,6 +22,14 @@
 
 #include "litehook.h"
 
+// 构建修复：iOS SDK 的 sys/sysctl.h 未定义以下两个 KERN_PROC 选择器，补 fallback 值
+#ifndef KERN_PROC_PIDINFO
+#define KERN_PROC_PIDINFO 17
+#endif
+#ifndef KERN_PROC_TBSDINFO
+#define KERN_PROC_TBSDINFO 18
+#endif
+
 cloak_policy_cache_t gCloakPolicy = { 0 };
 
 static bool gCloakPathInitialized = false;
@@ -202,12 +210,10 @@ static void cloak_scrub_kinfo_proc(struct kinfo_proc *kproc)
                 if (hide) {
                         kproc->kp_eproc.e_ucred.cr_uid  = 501;
                         kproc->kp_eproc.e_ucred.cr_gid  = 501;
-                        kproc->kp_eproc.e_ucred.cr_ruid = 501;
-                        kproc->kp_eproc.e_ucred.cr_rgid = 501;
+                        // 构建修复：用户态 struct _ucred 无 cr_ruid/cr_rgid/cr_svuid/cr_svgid
+                        // 成员（内核私有），删去这四行赋值；真实/保存 uid 由下方 p_ruid 覆盖。
                         kproc->kp_eproc.e_pcred.p_ruid  = 501;
                         kproc->kp_eproc.e_pcred.p_rgid  = 501;
-                        kproc->kp_eproc.e_ucred.cr_svuid = 501;
-                        kproc->kp_eproc.e_ucred.cr_svgid = 501;
                         // A stock system process never carries all-zero groups.
                         kproc->kp_eproc.e_ucred.cr_ngroups = 1;
                         for (int g = 1; g < NGROUPS; g++) {

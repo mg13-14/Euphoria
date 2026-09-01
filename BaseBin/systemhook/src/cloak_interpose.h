@@ -2,6 +2,7 @@
 #define CLOAK_INTERPOSE_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <sys/param.h>
 
 /*
