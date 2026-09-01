@@ -74,10 +74,11 @@ int eufs_state_load(eufs_state *s)
 	for (int i = 0; i < EUFS_ROLE_COUNT; i++) {
 		NSDictionary *r = roles[@(eufs_role_ids[i])];
 		if (![r isKindOfClass:[NSDictionary class]]) return -1;
+		// 构建修复：id 类型不能用点语法取 UTF8String，改消息发送
 		strlcpy(s->roles[i].volumeName, [r[@"volume"] isKindOfClass:[NSString class]]
-			? r[@"volume"].UTF8String : "", sizeof(s->roles[i].volumeName));
+			? [r[@"volume"] UTF8String] : "", sizeof(s->roles[i].volumeName));
 		strlcpy(s->roles[i].device, [r[@"device"] isKindOfClass:[NSString class]]
-			? r[@"device"].UTF8String : "", sizeof(s->roles[i].device));
+			? [r[@"device"] UTF8String] : "", sizeof(s->roles[i].device));
 		s->roles[i].bytes = [r[@"bytes"] isKindOfClass:[NSNumber class]] ? ((NSNumber *)r[@"bytes"]).unsignedLongLongValue : 0;
              s->roles[i].files = [r[@"files"] isKindOfClass:[NSNumber class]] ? ((NSNumber *)r[@"files"]).unsignedLongLongValue : 0;
 		if (s->roles[i].volumeName[0] == '\0' || s->roles[i].device[0] == '\0') return -1;
