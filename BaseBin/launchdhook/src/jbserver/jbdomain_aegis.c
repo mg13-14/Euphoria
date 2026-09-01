@@ -153,7 +153,8 @@ static int aegis_server_mount_report(void *a1, void *a2, void *a3, void *a4, voi
 
 struct jbserver_domain gAegisDomain = {
 	.permissionHandler = NULL, // GET_POLICY systemwide; mutations check per-action
-	.actions = (struct jbserver_action[]){
+	// 构建修复：actions 是柔性数组成员，不能用复合字面量初始化，改花括号
+	.actions = {
 		// JBS_AEGIS_GET_POLICY
 		{
 			.handler = aegis_server_get_policy,
