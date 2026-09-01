@@ -156,10 +156,13 @@ int necp_session_action_hook(int necp_fd, uint32_t action, uint8_t *in_buffer, s
 	return syscall(SYS_necp_session_action, necp_fd, action, in_buffer, in_buffer_length, out_buffer, out_buffer_length);
 }
 
+#endif
+
 // For the userland, there are multiple processes that will check CS_VALID for one reason or another
 // As we inject system wide (or at least almost system wide), we can just patch the source of the info though - csops itself
 // Additionally we also remove CS_DEBUGGED while we're at it, as on arm64e this also is not set and everything is fine
 // That way we have unified behaviour between both arm64 and arm64e
+// （构建修复：R38 将调用点移出 __arm64e__ 条件块，定义同步移出以保两架构可见）
 
 int csops_hook(pid_t pid, unsigned int ops, void *useraddr, size_t usersize)
 {
@@ -210,8 +213,6 @@ int csops_audittoken_hook(pid_t pid, unsigned int ops, void *useraddr, size_t us
 	}
 	return rv;
 }
-
-#endif
 
 bool should_enable_tweaks(void)
 {
