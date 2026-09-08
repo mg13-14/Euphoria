@@ -39,7 +39,7 @@ static bool cloak_caller_is_platform(audit_token_t *callerToken)
         return (csflags & CS_PLATFORM_BINARY);
 }
 
-static int cloak_get_policy(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int cloak_server_get_policy(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
         if (a1) *(bool *)a1    = jbsetting(cloakEnabled);
         if (a2) *(bool *)a2    = jbsetting(cloakHideMounts);
@@ -52,7 +52,7 @@ static int cloak_get_policy(void *a1, void *a2, void *a3, void *a4, void *a5, vo
         return 0;
 }
 
-static int cloak_enable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int cloak_server_enable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
         audit_token_t *callerToken = (audit_token_t *)a1;
         if (!cloak_caller_is_platform(callerToken)) return -2;
@@ -61,7 +61,7 @@ static int cloak_enable(void *a1, void *a2, void *a3, void *a4, void *a5, void *
         return 0;
 }
 
-static int cloak_disable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int cloak_server_disable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
         audit_token_t *callerToken = (audit_token_t *)a1;
         if (!cloak_caller_is_platform(callerToken)) return -2;
@@ -70,7 +70,7 @@ static int cloak_disable(void *a1, void *a2, void *a3, void *a4, void *a5, void 
         return 0;
 }
 
-static int cloak_set_options(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+static int cloak_server_set_options(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
 {
         audit_token_t *callerToken = (audit_token_t *)a1;
         if (!cloak_caller_is_platform(callerToken)) return -2;
@@ -112,10 +112,11 @@ static int cloak_mount_report(void *a1, void *a2, void *a3, void *a4, void *a5, 
 
 struct jbserver_domain gCloakDomain = {
         .permissionHandler = NULL, // GET_POLICY is systemwide; mutations check per-action
-        .actions = (struct jbserver_action[]){
+        // 构建修复：actions 是柔性数组成员，不能用复合字面量初始化，改花括号
+        .actions = {
                 // JBS_CLOAK_GET_POLICY
                 {
-                        .handler = cloak_get_policy,
+                        .handler = cloak_server_get_policy,
                         .args = (jbserver_arg[]){
                                 { .name = "enabled",          .type = JBS_TYPE_BOOL,   .out = true },
                                 { .name = "hideMounts",       .type = JBS_TYPE_BOOL,   .out = true },
@@ -133,7 +134,7 @@ struct jbserver_domain gCloakDomain = {
                 },
                 // JBS_CLOAK_ENABLE
                 {
-                        .handler = cloak_enable,
+                        .handler = cloak_server_enable,
                         .args = (jbserver_arg[]){
                                 { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
                                 { 0 },
@@ -141,7 +142,7 @@ struct jbserver_domain gCloakDomain = {
                 },
                 // JBS_CLOAK_DISABLE
                 {
-                        .handler = cloak_disable,
+                        .handler = cloak_server_disable,
                         .args = (jbserver_arg[]){
                                 { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
                                 { 0 },
@@ -149,7 +150,7 @@ struct jbserver_domain gCloakDomain = {
                 },
                 // JBS_CLOAK_SET_OPTIONS
                 {
-                        .handler = cloak_set_options,
+                        .handler = cloak_server_set_options,
                         .args = (jbserver_arg[]){
                                 { .name = "caller-token",     .type = JBS_TYPE_CALLER_TOKEN, .out = false },
                                 { .name = "hideMounts",       .type = JBS_TYPE_BOOL,         .out = false },
