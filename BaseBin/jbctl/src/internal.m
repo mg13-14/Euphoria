@@ -7,6 +7,15 @@
 
 SInt32 CFUserNotificationDisplayAlert(CFTimeInterval timeout, CFOptionFlags flags, CFURLRef iconURL, CFURLRef soundURL, CFURLRef localizationURL, CFStringRef alertHeader, CFStringRef alertMessage, CFStringRef defaultButtonTitle, CFStringRef alternateButtonTitle, CFStringRef otherButtonTitle, CFOptionFlags *responseFlags) API_AVAILABLE(ios(3.0));
 
+// 构建修复：Objective-C block 不能隐式转换为 C 函数指针（rootful_fakefs_run
+// 的 progress 参数），改为静态 C 函数，行为等价（逐行打印 + 刷 stdout）。
+static void jbctl_fakefs_progress_cb(const char *line, void *ctx)
+{
+        (void)ctx;
+        printf("[jbctl] %s\n", line);
+        fflush(stdout);
+}
+
 void execute_unsandboxed(void (^block)(void))
 {
         uint64_t credBackup = 0;
@@ -175,11 +184,7 @@ int jbctl_handle_internal(const char *command, int argc, char* argv[])
                         if (ok) {
                                 char err[192] = { 0 };
                                 int r = rootful_fakefs_run(sub, extra,
-                                        ^(const char *line, void *ctx) {
-                                                (void)ctx;
-                                                printf("[jbctl] %s\n", line);
-                                                fflush(stdout);
-                                        }, NULL, err, sizeof(err));
+                                        jbctl_fakefs_progress_cb, NULL, err, sizeof(err));
                                 if (r != 0 && err[0]) printf("[jbctl] ERROR: %s\n", err);
                                 return r;
                         }

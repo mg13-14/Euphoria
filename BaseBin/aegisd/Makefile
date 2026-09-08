@@ -2,8 +2,9 @@ TARGET = aegisd
 
 CC = clang
 
-CFLAGS = -I../.include -I./src -isysroot $(shell xcrun --sdk iphoneos --show-sdk-path) -arch arm64 -arch arm64e -miphoneos-version-min=15.0 -Wno-deprecated-declarations -D BUILD_STANDALONE=$(BUILD_STANDALONE) -O2
-LDFLAGS = -lbsm
+# 构建修复：libjailbreak util.c 包含 <archive.h>，补 libarchive 头文件路径与链接库
+CFLAGS = -I../.include -I./src -I$(shell brew --prefix)/opt/libarchive/include -isysroot $(shell xcrun --sdk iphoneos --show-sdk-path) -arch arm64 -arch arm64e -miphoneos-version-min=15.0 -Wno-deprecated-declarations -D BUILD_STANDALONE=$(BUILD_STANDALONE) -O2
+LDFLAGS = -lbsm -larchive
 
 sign: $(TARGET)
 	@ldid -Cadhoc -Sentitlements.plist $<
