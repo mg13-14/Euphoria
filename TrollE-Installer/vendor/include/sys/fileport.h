@@ -11,10 +11,13 @@
 #include <stdint.h>
 #include <mach/mach.h>
 
+/* XNU 原义：fileport_t 即 mach_port_t（bsd/sys/fileport.h） */
+typedef mach_port_t fileport_t;
+
 __BEGIN_DECLS
 
-extern kern_return_t fileport_makeport(int fd, mach_port_t *port);
-extern int fileport_makefd(mach_port_t port);
+extern kern_return_t fileport_makeport(int fd, fileport_t *port);
+extern int fileport_makefd(fileport_t port);
 
 __END_DECLS
 
