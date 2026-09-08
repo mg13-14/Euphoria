@@ -33,7 +33,10 @@ APP_NAME    := TrollE-Installer
 BUNDLE_ID   := dev.euphoria.trolle-installer
 VERSION     := 0.9.1
 APP_MIN_IOS := 14.0
-EXP_MIN_IOS := 15.0   # exploit 域下限（iOS 14.x 无可用内核向量→引擎C 兜底）
+# exploit 域下限（iOS 14.x 无可用内核向量→引擎C 兜底）
+# 注意：值后禁止行内注释——Make 会把注释前空格一并收进变量，
+# -miphoneos-version-min="15.0   " 解析失败→ld 报 "0.0 minimum deployment target"
+EXP_MIN_IOS := 15.0
 
 BUILD       := build
 VENDOR_LIB  := vendor/lib
