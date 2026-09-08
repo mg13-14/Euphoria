@@ -249,7 +249,8 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     }
 
     // ⑤ uicache 刷新图标
-    int r = exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache").fileSystemRepresentation,
+    // 构建修复：JBROOT_PATH 传 C 字符串返回 const char*，直接传给 exec_cmd_trusted
+    int r = exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"),
                              "-p", destPath.fileSystemRepresentation, NULL);
     if (r != 0) {
         EUTrolleLog(@"巨魔E：uicache 返回 %d（图标可能需注销后出现）", r);
@@ -302,7 +303,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     [entries filterUsingPredicate:[NSPredicate predicateWithFormat:@"bundleID != %@", bundleID]];
     [self saveEntries:entries];
 
-    exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache").fileSystemRepresentation, "-u", [target[@"path"] stringByDeletingLastPathComponent].fileSystemRepresentation, NULL);
+    exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"), "-u", [target[@"path"] stringByDeletingLastPathComponent].fileSystemRepresentation, NULL);
     return removed;
 }
 
