@@ -24,6 +24,29 @@
 
 #include "litehook.h"
 
+// 构建修复：iOS SDK 的 sys/sysctl.h 未定义以下两个 KERN_PROC 选择器，补 fallback 值
+#ifndef KERN_PROC_PIDINFO
+#define KERN_PROC_PIDINFO 17
+#endif
+#ifndef KERN_PROC_TBSDINFO
+#define KERN_PROC_TBSDINFO 18
+#endif
+
+// XNU 完整 _ucred 前缀布局：SDK 公开 struct _ucred 只到 cr_groups，
+// cr_ruid/cr_svuid/cr_rgid/cr_svgid 为 KERNEL_PRIVATE。sysctl 返回的
+// kinfo_proc 来自内核，内存布局即完整 _ucred——按 XNU bsd/sys/ucred.h
+// 前缀（到 cr_svgid）本地定义并强转访问，避免依赖私有头。
+struct _ucred_xnu_prefix {
+	u_long  cr_version;
+	uid_t   cr_uid;
+	short   cr_ngroups;
+	gid_t   cr_groups[NGROUPS];
+	uid_t   cr_ruid;
+	uid_t   cr_svuid;
+	uid_t   cr_rgid;
+	gid_t   cr_svgid;
+};
+
 cloak_policy_cache_t gCloakPolicy = { 0 };
 
 static bool gCloakPathInitialized = false;
@@ -265,20 +288,22 @@ static void cloak_scrub_kinfo_proc(struct kinfo_proc *kproc)
         if (kproc->kp_proc.p_pid != getpid() && kproc->kp_eproc.e_ucred.cr_uid == 0) {
                 bool hide = gCloakPolicy.hideCredentials && !cloak_process_is_trusted();
                 if (hide) {
-                        kproc->kp_eproc.e_ucred.cr_uid  = 501;
-                        kproc->kp_eproc.e_ucred.cr_gid  = 501;
-                        kproc->kp_eproc.e_ucred.cr_ruid = 501;
-                        kproc->kp_eproc.e_ucred.cr_rgid = 501;
+                        const struct _ucred_xnu_prefix *uc = (const struct _ucred_xnu_prefix *)&kproc->kp_eproc.e_ucred;
+                        struct _ucred_xnu_prefix *ucw = (struct _ucred_xnu_prefix *)&kproc->kp_eproc.e_ucred;
+                        (void)uc;
+                        ucw->cr_uid  = 501;
+                        ucw->cr_ruid = 501;
+                        ucw->cr_svuid = 501;
+                        ucw->cr_rgid = 501;
+                        ucw->cr_svgid = 501;
                         kproc->kp_eproc.e_pcred.p_ruid  = 501;
                         kproc->kp_eproc.e_pcred.p_rgid  = 501;
-                        kproc->kp_eproc.e_ucred.cr_svuid = 501;
-                        kproc->kp_eproc.e_ucred.cr_svgid = 501;
                         // A stock system process never carries all-zero groups.
-                        kproc->kp_eproc.e_ucred.cr_ngroups = 1;
+                        ucw->cr_ngroups = 1;
                         for (int g = 1; g < NGROUPS; g++) {
-                                kproc->kp_eproc.e_ucred.cr_groups[g] = 0;
+                                ucw->cr_groups[g] = 0;
                         }
-                        kproc->kp_eproc.e_ucred.cr_groups[0] = 501;
+                        ucw->cr_groups[0] = 501;
                 }
         }
 }
