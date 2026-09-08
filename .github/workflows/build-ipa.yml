@@ -30,9 +30,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 依赖（ldid/dpkg）
+      - name: 依赖（ldid/dpkg/libarchive）
         run: |
-          brew install ldid dpkg || true
+          brew install ldid dpkg libarchive || true
           xcodebuild -version
           xcrun -sdk iphoneos -show-sdk-version
 

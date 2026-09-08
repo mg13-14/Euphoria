@@ -19,9 +19,11 @@ CFLAGS = -framework Foundation -framework CoreServices -framework Security \
 	-I../include -I../modules/litehook/src -I../ChOma/include \
 	-I$(BREW_PREFIX)/opt/libarchive/include
 
-# -F 段：IOKit/IOSurface 走 macOS SDK 桩（iOS SDK 不带 IOKit 头；
-# 运行时 iOS DSC 均在位，weak 链接兜底）；IOMobileFramebuffer 走 vendor tbd
-CFLAGS += -F$(MACOS_SDK)/System/Library/Frameworks -F../frameworks \
+# -F 段：IOKit/IOSurface 头文件与 tbd 均由 iPhoneOS SDK 自带，直接 weak 链接
+# 即可（旧版曾 -F 整个 macOS SDK Frameworks 目录取桩，Xcode 26 下会让 UIKit
+# 链误命中 macOS 版 CoreImage/CoreVideo——CVOpenGLESTexture.h 缺失报错）；
+# IOMobileFramebuffer 走 vendor tbd
+CFLAGS += -F../frameworks \
 	-weak_framework IOKit -weak_framework IOSurface \
 	-framework IOMobileFramebuffer
 
