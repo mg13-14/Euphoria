@@ -1,6 +1,11 @@
 #ifndef JBROOT_H
 #define JBROOT_H
 
+// PATH_MAX（limits.h）/strlcpy/strlcat（string.h）——
+// 本头内联函数直接使用，不能依赖传递包含。
+#include <limits.h>
+#include <string.h>
+
 extern char *_Nullable get_jbroot(void);
 
 // Partially adapted from libroot for consistency

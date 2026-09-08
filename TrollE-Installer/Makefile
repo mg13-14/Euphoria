@@ -59,9 +59,8 @@ EXPLOIT_DIRS := $(filter-out $(EXPLOIT_EXCLUDE),$(patsubst Exploits/%/, %, $(wil
 
 # 头文件搜索路径（app 与 exploit 共用的公共段）
 COMMON_INCS := -Ivendor/libjailbreak/src -Ivendor/ChOma/include -Ivendor/include
-COMMON_FWS  := -F$(MACOS_SDK)/System/Library/Frameworks \
-	       -Fvendor/frameworks \
-	       -weak_framework IOKit -weak_framework IOSurface
+COMMON_FWS  := -Fvendor/frameworks \
+            -weak_framework IOKit -weak_framework IOSurface
 
 all: package
 
