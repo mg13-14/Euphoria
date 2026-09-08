@@ -17,6 +17,11 @@
 
 name: build-ipa
 
+# GITHUB_TOKEN 默认只读时会 403（Resource not accessible by integration），
+# Release 需要 contents: write。
+permissions:
+  contents: write
+
 on:
   workflow_dispatch: {}          # 手动触发
   push:
