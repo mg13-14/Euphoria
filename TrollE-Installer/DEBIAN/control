@@ -1,0 +1,16 @@
+Package: dev.euphoria.trolle-installer
+Name: TrollE (巨魔E) Installer Standalone
+Author: Euphoria Project
+Maintainer: Euphoria Project
+Architecture: all
+Version: 0.9.1-9
+Section: System
+Priority: optional
+Homepage: https://github.com/euphoria-jb/Euphoria
+Description: 巨魔E（TrollStore E）安装器——源码存档包（var/jb 数据段，Mac 构建用；装上无桌面图标属正常）。
+ 越狱态：本 deb 装入 /var/jb，等价主树引擎 B/C 入口。
+ 免越狱态：经侧载 IPA（AltStore/SideStore）运行，CT 域内跑一次性漏洞会话装出本体，
+ 本体脱狱独立常驻。装出后不依赖 Euphoria App、不依赖本安装器。
+ .
+ 依赖说明：本包已去除 euphoria-basebin-link 依赖（源骨架 trolle-installer v0.9.1 的
+ 越狱态硬依赖在独立版不复存在——libjailbreak/choma 以静态链接随包携带）。

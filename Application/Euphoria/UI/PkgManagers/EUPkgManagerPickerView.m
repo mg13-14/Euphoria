@@ -38,7 +38,11 @@
         NSArray *packageManagers = [[EUUIManager sharedInstance] availablePackageManagers];
         [packageManagers enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
             NSDictionary *manager = (NSDictionary *)obj;
-            EUAppSwitch *appSwitch = [[EUAppSwitch alloc] initWithIcon:[UIImage imageNamed:manager[@"Icon"]] title:manager[@"Display Name"]];
+            // 图标兜底（EPM 无资产文件）：nil 会留空白位——用系统图标占位
+            //（C 2026-09-05 随 EPM 选项接入）
+            UIImage *icon = [UIImage imageNamed:manager[@"Icon"]];
+            if (!icon) icon = [UIImage systemImageNamed:@"shippingbox.fill"];
+            EUAppSwitch *appSwitch = [[EUAppSwitch alloc] initWithIcon:icon title:manager[@"Display Name"]];
             appSwitch.selected = [[[EUUIManager sharedInstance] enabledPackageManagerKeys] containsObject:manager[@"Key"]];
             appSwitch.onSwitch = ^(BOOL enabled) {
                 [[EUUIManager sharedInstance] setPackageManager:manager[@"Key"] enabled:enabled];

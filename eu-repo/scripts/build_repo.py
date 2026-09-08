@@ -57,19 +57,29 @@ def main():
     print(f"    Packages 索引完成：{n} 个包")
 
     # 3. 生成 Release（含哈希清单；Date 用 UTC RFC1123）
+    # 2026-09-05 C 修复：原 sums() 把 md5+sha 拼成同一行（四字段），MD5Sum/SHA256
+    # 两段全部格式损坏——Sileo/dpkg 解析即"源无效"（用户 19:30 实报）。正确格式：
+    #   MD5Sum: 段每行 = <md5hex> <size> <filename>（3 字段）
+    #   SHA256: 段每行 = <sha256hex> <size> <filename>（3 字段）
     print("[3/3] 生成 Release ...")
     def sums(path):
         data = open(os.path.join(root, path), "rb").read()
-        md5 = hashlib.md5(data).hexdigest(); sha = hashlib.sha256(data).hexdigest()
-        return f" {md5} {sha} {len(data)} {path}"
+        md5 = hashlib.md5(data).hexdigest()
+        sha = hashlib.sha256(data).hexdigest()
+        return f" {md5} {len(data)} {path}", f" {sha} {len(data)} {path}"
+    md5_lines, sha_lines = [], []
+    for p in ("Packages", "Packages.gz"):
+        m, s = sums(p)
+        md5_lines.append(m)
+        sha_lines.append(s)
     date = datetime.datetime.now(datetime.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S UTC")
     release = (
         f"Origin: {args.origin}\nLabel: {args.label}\nSuite: {args.suite}\n"
         f"Version: 1.0\nCodename: {args.suite}\n"
         f"Architectures: {args.arch}\nComponents: main\n"
         f"Description: {args.desc}\nDate: {date}\n"
-        f"MD5Sum:\n{sums('Packages')}\n{sums('Packages.gz')}\n"
-        f"SHA256:\n{sums('Packages')}\n{sums('Packages.gz')}\n"
+        f"MD5Sum:\n" + "\n".join(md5_lines) + "\n"
+        f"SHA256:\n" + "\n".join(sha_lines) + "\n"
     )
     with open(os.path.join(root, "Release"), "w") as f:
         f.write(release)

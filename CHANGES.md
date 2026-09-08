@@ -183,3 +183,19 @@
 - **语义**：黑名单（aegis 名单）内=全套过滤视图（R38 双形态档位照常）；名单外=root/受信规则之外一律信任；blacklistMode=false=R40 前旧语义（非受信全隐藏）留兜底开关。
 - **用户三答收讫**：①"能动系统"验收=系统最高控制权（删改系统文件+常驻+L2 全要，具体验收条 S0 评审自拟）；②目前自用将来或分发（分发合规要留）；③顺序=容易的放先（易胜线 A15@15.6.1 先行）。
 - **致谢合规提醒（用户叮嘱"记得致谢的事"）**：R34 机制延续——Relaxin（MIT）收编时 Credits/License 页按 MIT 署名 OwnGoal Studio；**Titan 无许可证=默认保留所有权利，直接武器化有合规红线**，95% 评审需先裁（联系作者补许可或走自研/write-up 复现路线）。
+
+### 8.18 R41 巨魔E 安装器独立源码工程（2026-09-03 19:36 用户两连指令，C 骨架+B 深度移植）
+
+> 用户指令："把巨魔E安装器源代码单独搞出来，且不越狱就能安装"+"就能安装巨魔E"。
+> 交付物：`TrollE-Installer/`（主树内自包含子工程，可整目录拷走独立构建）。
+
+- **C 线骨架（19:38）**：引擎 B/C 完整抽取体 `EUStandalone*`（5 个解耦点：Logger/Environment/ExploitManager/JBROOT/registryPath 双模→沙盒镜像表唯一化），双形态分发（免越狱 IPA+eu-repo deb），THEOS 构建占位。
+- **B 线深度移植（20:0x）**：
+  - vendor 自包含化（ChOma/libjailbreak 源/私有头/litehook/IOMobileFramebuffer tbd 全量快照，`install_name` 改 @rpath）；
+  - 构建系统重写：THEOS→纯 Xcode 工具链+ldid，根 Makefile 五步链（ChOma→libjailbreak→9 exploit framework→app→签名→双产物）；
+  - `scripts/build-exploit.sh`：exploit 目录直编 .framework（剔除 weightBufs 演示 main、PlistBuddy 注入 CFBundle* 键、@rpath 链 libjailbreak、IOKit/IOSurface weak 走 macOS SDK 桩）；
+  - 双产物：`.tipa`（ldid -SEntitlements.plist：platform/no-sandbox/iokit 白名单——巨魔通道装保留特权）+ `.ipa`（侧载通道）；
+  - UI 线程模型修正：安装链后台串行队列（原主线程直跑=看门狗风险）、引擎内 openURL hop 主线程、UIDocumentPicker 升 iOS 14+ UTType API（ipa/tipa）、已装清单+卸载+致谢页；
+  - `make deb`（dpkg-deb）+ `scripts/sync-from-euphoria.sh`（主树重同步，解耦层人工比对）。
+- **诚实边界**：本环境无 iOS 工具链——编译验证在用户 macOS 首跑（BUILD.md 排障表备好）；引擎 B entitlement 门禁 spike（B25-1 三候选）未实机裁决，安装器内标注【实验性】；引擎 C 安装侧完整但进程内启动器=主树 V0.9.2 待办件（URL scheme 口已留）。
+- **勘误（对群内 19:38 口径）**：引擎 B 在主树 EUTrollE.m **非契约桩**——L141-144 路由 + L309 起八步实现体（libarchive 解包/rootify 17+ 直写/MCM custom 法/LS 注册/零残留收尾）齐全，C 的独立版 `EUStandaloneInstaller.m` 为其完整抽取体；待办=实机验证与门禁 spike，非实现。

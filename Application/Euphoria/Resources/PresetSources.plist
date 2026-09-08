@@ -20,9 +20,10 @@
        · roothide 官方=roothide.github.io（根 Release 200）
        · roothide 镜像=roothide.github.io/procursus（suite=iphoneos-arm64e/{BOOTSTRAP}
          带代数路径才活——裸 iphoneos-arm64e/ 是 404，A 的"死链"结论系探活路径错误）
-     EU 源槽（eu / eu-roothide）：URL 留空=占位（writePresetSources 跳过空 URL 条目），
-     R17 域名定案后单点填入即激活，零代码变更。eu-repo 实体已建（A：dpkg-scanpackages
-     索引+ed25519 签名链端到端验通）；roothide 形态=服务端 Patcher 转换（B20 §2）。
+     EU 源槽（eu / eu-roothide）：R17 域名已定案=euphoria-repo.surge.sh（B 2026-09-05
+     激活 eu 槽——线上 9 文件+签名链验通）。eu-roothide 槽=roothide arm64e 形态，
+     需服务端 Patcher 转换（B20 §2）后激活，当前如实留空（writePresetSources 跳过
+     空 URL 条目，不写死源）。
      {BOOTSTRAP}=EUBootstrapper bootstrapVersion（与本次解包 tar 同源，永不漂移）。
      zh_CN 镜像（iosjb.top）与 Zebra 容器写法为后续决策点，见 B20 交付文档§四。 -->
 <dict>
@@ -92,7 +93,7 @@
                         <key>Key</key>
                         <string>eu</string>
                         <key>URL</key>
-                        <string></string>
+                        <string>https://euphoria-repo.surge.sh/</string>
                         <key>Suites</key>
                         <string>./</string>
                         <key>Components</key>

@@ -23,6 +23,15 @@ git init && git submodule update --init
 
 ## 构建步骤
 
+> ⚠️ **必须走根 `make`，禁止单独 `xcodebuild Application/`**（回头查错实证 2026-09-05）：
+> Xcode 工程的 Resources 引用了 `Packages/libroot/libroot.deb`、
+> `Packages/libkrw-provider/libkrw-euphoria.deb`、
+> `Packages/additional/launchctl_1_1.2.0_iphoneos-arm64.deb`、
+> `Packages/basebin-link/basebin-link.deb` 四个构建期产物 deb——
+> 其中 libroot/libkrw-euphoria 是 **Makefile 产出的待构建件**（Packages/Makefile
+> → package 目标→dpkg-deb 打包），单独跑 xcodebuild 会因缺件直接报错。
+> 根 `make` 的顺序（BaseBin → Packages → Application）已保证先出 deb 再编译。
+
 ```bash
 # 1. 构建 BaseBin（运行时核心）+ Packages + Application
 make
@@ -33,6 +42,21 @@ make -C BaseBin
 # 3. 产物
 #    Application/Euphoria.tipa   ← 越狱主产物（TrollStore IPA）
 ```
+
+### 捆绑件预检（编译前 30 秒自查）
+
+```bash
+# 四个 deb 必须在位（缺件=Resources 阶段必挂）
+ls Packages/libroot/libroot.deb \
+   Packages/libkrw-provider/libkrw-euphoria.deb \
+   Packages/additional/launchctl_1_1.2.0_iphoneos-arm64.deb \
+   Packages/basebin-link/basebin-link.deb \
+   Application/Euphoria/Resources/ellekit.deb \
+   Application/Euphoria/Resources/ellekit_roothide.deb
+```
+
+缺哪个就先 `make -C Packages`（或对应子目录 `make package`）；launchctl/basebin-link
+为静态件在树内；ElleKit 双变体（rootless 主件 + roothide 回退）在 Resources/。
 
 ## 部署到设备
 

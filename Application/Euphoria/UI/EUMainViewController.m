@@ -13,11 +13,41 @@
 #import "EUActionMenuButton.h"
 #import "EUUpdateViewController.h"
 #import "EULogCrashViewController.h"
+#import "EUTrollE.h"
+#import "EUPkgManagerPickerViewController.h"
+#import "EUTrollEMainViewController.h" // 巨魔E 主页（2026-09-07 20:55 用户指令：TrollStore 式+底栏三 tab）
 #import <pthread.h>
 #import <sys/sysctl.h>
 #import <libjailbreak/libjailbreak.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
-@interface EUMainViewController ()
+// 巨魔E 入口（B ③ spec / 08 规范 / R35 域契约）——CT 永久子域判定（C24 矩阵 UI 面）：
+//   ① 14.0b2~16.6.1 全系 ② 16.7 b/RC(20H18) ③ 17.0 各 build。
+//   build 级精确（kern.osversion sysctl）：16.7 用 20H18/20H19 分界；粗版本先行短路。
+//   域内未越狱=引擎B（CT 永久签印）；域外（16.7GA/17.0.1+/18.x/26.x）=引擎C 结界庇护。
+//   2026-09-06 C 修复（kimik3 清单⑬）：17.0.1+（patch≥1，如 17.0.1~17.0.3）
+//   原判定 `minorVersion == 0` 误判域内——补 patchVersion 判定；16.7 分界与主树
+//   EUTrollE.m 统一为精确 20H18（原 <= 字典序偏宽）。
+//   落码：并行搜索员C，2026-09-05（主 App 入口半场）。
+static BOOL EUTrollECTPermanentDomain(void)
+{
+    NSOperatingSystemVersion v = [NSProcessInfo processInfo].operatingSystemVersion;
+    if (v.majorVersion == 17) return (v.minorVersion == 0 && v.patchVersion == 0);
+    if (v.majorVersion == 16) {
+        if (v.minorVersion < 7) return YES;
+        if (v.minorVersion > 7) return NO;
+        // 16.7：b/RC(20H18) 在域内，GA(20H19+) 域外——build 精确判定
+        char build[64] = {0};
+        size_t len = sizeof(build) - 1;
+        if (sysctlbyname("kern.osversion", build, &len, NULL, 0) != 0) return NO;
+        return (strcmp(build, "20H18") == 0); // 与主树 EUTrollE.m 同口径
+    }
+    if (v.majorVersion == 15) return YES;
+    if (v.majorVersion == 14) return YES; // 代码超集（R35 承诺域从 15.0 起，14.x 不对外承诺）
+    return NO; // 18.x / 26.x / 其它
+}
+
+@interface EUMainViewController () <UIDocumentPickerDelegate>
 
 @property EUJailbreakButton *jailbreakBtn;
 @property NSArray<NSLayoutConstraint *> *jailbreakButtonConstraints;
@@ -88,6 +118,17 @@
     
     //Action Menu
     EUActionMenuView *actionView = [[EUActionMenuView alloc] initWithActions:@[
+        // 巨魔E 入口（B ③ spec：双态可见；三态徽标语义先于仙气——08 规范 §五/§九.3，
+        // 文案用 B 线已集成方言保持两 App 一致）
+        // 2026-09-07 20:55 用户指令升级：入口改为进巨魔E 主页（TrollStore 式列表
+        // +底部小横板三 tab：应用/插件注入/设置，参考巨魔R）——C 线 ③ 数据层+页骨架
+        [UIAction actionWithTitle:[self trolleMenuTitle] image:[UIImage systemImageNamed:@"sparkles" withConfiguration:[EUGlobalAppearance smallIconImageConfiguration]] identifier:@"trolle-install" handler:^(__kindof UIAction * _Nonnull action) {
+            [self.navigationController pushViewController:[[EUTrollEMainViewController alloc] init] animated:YES];
+        }],
+        // EPM 入口（T18 契约 v1 内嵌页：已装清单+刷新；用户 19:35:28 点名补位）
+        [UIAction actionWithTitle:@"EPM · 仙市（自研包管理器）" image:[UIImage systemImageNamed:@"shippingbox.fill" withConfiguration:[EUGlobalAppearance smallIconImageConfiguration]] identifier:@"epm-packages" handler:^(__kindof UIAction * _Nonnull action) {
+            [self.navigationController pushViewController:[[EUPMPackagesViewController alloc] init] animated:YES];
+        }],
         [UIAction actionWithTitle:EULocalizedString(@"Menu_Settings_Title") image:[UIImage systemImageNamed:@"gearshape" withConfiguration:[EUGlobalAppearance smallIconImageConfiguration]] identifier:@"settings" handler:^(__kindof UIAction * _Nonnull action) {
             [self.navigationController pushViewController:[[EUSettingsController alloc] init] animated:YES];
         }],
@@ -389,6 +430,79 @@
         return [[EUEnvironmentManager sharedManager] isJailbroken];
     }
     return YES;
+}
+
+#pragma mark - 巨魔E 仙器阁（入口 · 引擎门面路由 · 08 规范仙境文案）
+
+- (NSString *)trolleMenuTitle
+{
+    BOOL jailbroken = [[EUEnvironmentManager sharedManager] isJailbroken];
+    if (jailbroken) return @"巨魔E · 仙器阁 — 御剑秒装";
+    if (EUTrollECTPermanentDomain()) return @"巨魔E · 仙器阁 — 仙门大开（永久签印）";
+    return @"巨魔E · 仙器阁 — 结界庇护（容器）";
+}
+
+// 路由（R32/R35 契约：越狱态零辅助直装；未越狱 CT 域走引擎B；域外显式引擎C，
+// 不走 Auto——Auto 在未越狱域外会把引擎B 顶到 DomainUnsupported 硬壁上）
+- (EUTrollEInstallMode)trolleRouteMode
+{
+    if ([[EUEnvironmentManager sharedManager] isJailbroken]) return EUTrollEInstallModeAuto;
+    if (EUTrollECTPermanentDomain()) return EUTrollEInstallModeAuto;
+    return EUTrollEInstallModeContainerized;
+}
+
+- (void)presentTrollEDocumentPicker
+{
+    NSMutableArray<UTType *> *types = [NSMutableArray new];
+    for (NSString *ext in @[@"ipa", @"tipa"]) {
+        UTType *t = [UTType typeWithFilenameExtension:ext];
+        if (t) [types addObject:t];
+    }
+    UIDocumentPickerViewController *picker =
+        [[UIDocumentPickerViewController alloc] initWithDocumentTypes:types.copy
+                                                            inMode:UIDocumentPickerModeImport];
+    picker.delegate = self;
+    picker.modalPresentationStyle = UIModalPresentationFormSheet;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller
+didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
+{
+    if (urls.count == 0) return;
+    NSURL *appURL = urls.firstObject;
+    BOOL scoped = [appURL startAccessingSecurityScopedResource];
+
+    [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:@"巨魔E · 渡劫启程（%@）", appURL.lastPathComponent]
+        debug:NO]; // 主标题走 UI 日志窗；工程细节日志由引擎层打印（保持原样）
+    EUTrollEInstallMode mode = [self trolleRouteMode];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSError *err = nil;
+        BOOL ok = [[EUTrollE sharedInstance] installApplicationAtURL:appURL
+                                                                mode:mode
+                                                               error:&err];
+        if (scoped) [appURL stopAccessingSecurityScopedResource];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSString *result = ok
+                ? @"✅ 登仙功成（安装完成）"
+                : [NSString stringWithFormat:@"❌ 渡劫未成（%ld：%@）",
+                    (long)err.code, err.localizedDescription ?: @"无错误详情"];
+            UIAlertController *alert = [UIAlertController
+                alertControllerWithTitle:@"巨魔E · 仙器阁"
+                                 message:result
+                          preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"归位"
+                                                      style:UIAlertActionStyleDefault
+                                                    handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+            [[EUUIManager sharedInstance] sendLog:result debug:NO];
+        });
+    });
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller
+{
+    [[EUUIManager sharedInstance] sendLog:@"巨魔E · 渡劫暂缓（未选择 IPA）" debug:YES];
 }
 
 #pragma mark - Status Bar

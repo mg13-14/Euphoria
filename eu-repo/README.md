@@ -1,8 +1,27 @@
 # EU 官方源（eu-repo）——T18-e 实建交付
 
 > 模式：roothide 同款 Flat 结构 + GitHub Pages 零服务器分发（A_T18 情报底座 §五方案 A）。
-> 状态：**实体已建成**（索引构建器/签名器/首包巨魔E 安装器 deb 全通，测试密钥端到端验签通过）。
+> 状态：**实体已建成+2026-09-04 真实化修复**（池 3 包·死依赖闭合·索引/签名链全通）。
 > 交付人：并行搜索员A，2026-08-28 凌晨（应汇总员 00:25:01 派件②）。
+> 2026-09-04 修复：并行搜索员C（对应用户实测批评"源里没有真实文件/依赖死链"——见文末修复记录）。
+
+## 2026-09-04 修复记录（C）
+
+| 项 | 修复前 | 修复后 |
+|---|---|---|
+| 池内包数 | 1（trolle-installer 1.6KB 骨架） | 3（见下） |
+| 死依赖 | trolle-installer `Depends: euphoria-basebin-link` 池内不存在→安装必失败 | basebin-link 真实入池（1.0.0），依赖可解 |
+| 真实包 | 0 | **2**（basebin-link + launchctl） |
+| 签名 | 旧测试密钥（私钥已随 08-28 会话失传，仅公钥残留） | 新 ed25519 测试密钥 `6FE1C7C972DBA26B`（loopback 无头生成），InRelease+Release.gpg 验签 Good |
+
+- `euphoria-basebin-link 1.0.0`：纯数据包（control+3 符号链接→/var/jb/basebin/*），本地构出。
+  构建注记：沙盒禁 `ln -s`，改用 Python tarfile 在归档层生成符号链接条目后手工组 ar（源码级
+  等价于 Packages/basebin-link/Makefile 的 dpkg-deb 产物，dpkg-deb -I/-c 验证通过）。
+- `launchctl 1:1.2.0`：主树 `Packages/additional/` 既有真实成品（52KB，rootless 布局 /var/jb）。
+- `trolle-installer 0.9.1`：仍是骨架（真实载荷=安装器本体，卡 macOS 构建——B 线口径"编译验证待
+  用户 macOS 首跑"）；依赖已可解析，装它不再报依赖错误。
+- **部署 URL 仍卡（如实）**：①账号/域名定案（T18-0，管理员级）；②安装器真包入池（B 线构建后）。
+  当前池内容=诚实最小集：源可用、无死链、无虚假宣称。
 
 ## 目录结构（=GitHub Pages 站点根，整目录推送即部署）
 
@@ -66,11 +85,15 @@ git add -A && git commit -m "repo: add <包名>" && git push
 | Flat 无 ByHash（弱增量刷新） | 起步期包量小无感；V1.0 切 aptly dists 结构时升级（切源 URL 即可，用户无感） |
 | Flat 结构 Sileo/Zebra/apt 通用性 | 本结构=Cydia 传统 Flat，三端全兼容（roothide 同款在产验证） |
 
-## 已验证清单（本次实建）
+## 已验证清单
 - [x] dpkg-deb 构建巨魔E 安装器 deb（1692B，postinst 含目录结构+致谢）
 - [x] dpkg-scanpackages 索引生成（相对 Filename 路径+三哈希）
 - [x] 架构过滤（仅 iphoneos-arm64，防 rootful 包混入——A_T18 §一.4 坑）
 - [x] Release 生成（MD5Sum+SHA256 双段）
 - [x] ed25519 测试密钥签名 → InRelease+Release.gpg → gpg --verify 验签通过
+- [x] 【09-04】basebin-link 纯数据包本地构出（tar 层符号链接注入，dpkg-deb -I/-c 双验）
+- [x] 【09-04】launchctl 真实成品入池；死依赖闭合（trolle-installer Depends 可解析）
+- [x] 【09-04】新测试密钥 6FE1C7C972DBA26B 重签全链（InRelease+Release.gpg+公钥导出）
 - [ ] 生产密钥替换+Pages 实部署（需域名/账号定案，T18-0）
 - [ ] PresetSources.plist 欧源槽接入（C 的 T18-d 窗口）
+- [ ] trolle-installer 真实载荷入池（B 线 macOS 构建后，替换 0.9.1 骨架）

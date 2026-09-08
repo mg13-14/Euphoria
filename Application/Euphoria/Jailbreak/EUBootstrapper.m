@@ -521,6 +521,15 @@ NSString *const bootstrapErrorDomain = @"BootstrapErrorDomain";
 // 模式判定：本地偏好 rootfulUserEnabled（与设置页开关同键）——
 //   false（默认）→ roothide 模式；true → rootful（复用 rootless 清单）。
 // 兼容：顶层为 array（旧结构）时原样返回（roothide 单集），不崩。
+// 【模式判定 SSOT 化（C 2026-09-05 要求，B 落地）】：三态裁定收敛为
+//   bootstrapModeKey 单点方法——presetSources（源集选择）与 ElleKit 变体
+//   选择（R25-2）共用同一判定，杜绝两处判定漂移。
+- (NSString *)bootstrapModeKey
+{
+    BOOL rootful = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"rootfulUserEnabled" fallback:NO];
+    BOOL roothide = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"roothideUserEnabled" fallback:NO];
+    return (roothide && !rootful) ? @"Mode-Roothide" : @"Mode-Rootless";
+}
 - (NSArray*)presetSources
 {
     static NSArray *sources = nil;
@@ -538,7 +547,7 @@ NSString *const bootstrapErrorDomain = @"BootstrapErrorDomain";
         BOOL rootful = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"rootfulUserEnabled" fallback:NO];
         BOOL roothide = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"roothideUserEnabled" fallback:NO];
         // 源单只分两集：Mode-Roothide（roothide 单开）vs Mode-Rootless（rootless 默认+rootful 复用）
-        NSString *modeKey = (roothide && !rootful) ? @"Mode-Roothide" : @"Mode-Rootless";
+        NSString *modeKey = [self bootstrapModeKey];
         NSArray *list = root[modeKey];
         if (![list isKindOfClass:[NSArray class]]) {
             // 防御：无该模式段时回退另一段，再回退空
@@ -617,7 +626,15 @@ static void EUSetSourceFileImmutable(NSString *path, BOOL immutable)
 {
     NSArray *enabledPackageManagers = [[EUUIManager sharedInstance] enabledPackageManagers];
     for (NSDictionary *packageManagerDict in enabledPackageManagers) {
-        NSString *path = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:packageManagerDict[@"Package"]];
+        // EPM（T18 契约 v1）：自研包管理器=App 内嵌页形态（复用 bootstrap 的
+        // apt/dpkg 通道），不是外部 deb——Package 字段为空时跳过安装步骤，
+        // 勾选状态仅入偏好（enabledPkgManagers），入口由主 App 菜单提供。
+        // C 落码 2026-09-05（用户点名"选项里没有自研包管理器"）。
+        NSString *packageFile = packageManagerDict[@"Package"];
+        if (![packageFile isKindOfClass:[NSString class]] || packageFile.length == 0) {
+            continue;
+        }
+        NSString *path = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:packageFile];
         NSString *name = packageManagerDict[@"Display Name"];
         int r = [self installPackage:path];
         if (r != 0) {
@@ -655,9 +672,13 @@ static void EUSetSourceFileImmutable(NSString *path, BOOL immutable)
     BOOL shouldInstallLibroot = [self shouldInstallPackage:@"libroot-euphoria"];
     BOOL shouldInstallLibkrw = [self shouldInstallPackage:@"libkrw0-euphoria"];
     BOOL shouldInstallBasebinLink = [self shouldInstallPackage:@"euphoria-basebin-link"];
-    // R25（SSOT v2.15）：注入器本体捆绑——ElleKit（roothide 版，ellekit.space 同名包
-    // 经 roothide 官方源 arm64e 构建）随 bootstrap 默认安装并默认启用；
+    // R25（SSOT v2.15）：注入器本体捆绑——ElleKit 随 bootstrap 默认安装并默认启用；
     // tweakInjectionEnabled 偏好默认 YES（EUJailbreaker），即开箱即注入。
+    // R25-2（B 线 2026-09-05 修复，用户日志实锤）：双变体 fallback——主件 ellekit.deb
+    // = rootless 版（iphoneos-arm64，ellekit.space 同名包 rootless 构建，/var/jb 布局），
+    // 设备 dpkg 架构不认（roothide arm64e 布局）时 fallback 到 ellekit_roothide.deb。
+    // 根因：旧版只捆 roothide arm64e 变体，Rootless 模式设备（dpkg 只认 iphoneos-arm64）
+    // 安装直接拒装——A13@18.1.1 用户日志实证。
     BOOL shouldInstallElleKit = [self shouldInstallPackage:@"ellekit"];
     BOOL shouldInstallLaunchctl = NO;
     if (__builtin_available(iOS 19.0, *)) {
@@ -669,9 +690,21 @@ static void EUSetSourceFileImmutable(NSString *path, BOOL immutable)
 
         if (shouldInstallElleKit) {
             [[EUUIManager sharedInstance] sendLog:@"Installing ElleKit (Tweak Injector)" debug:NO];
-            NSString *ellekitPath = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:@"ellekit.deb"];
+            // R25-2 双保险：①模式预选（bootstrapModeKey SSOT 判定：Mode-Rootless→rootless
+            // 件 iphoneos-arm64；Mode-Rothide→roothide 件 arm64e）②失败 fallback 换另一
+            // 变体（覆盖判定与设备 dpkg 实态不匹配的混杂态）。
+            NSString *modeKey = [self bootstrapModeKey];
+            BOOL roothideMode = [modeKey isEqualToString:@"Mode-Rothide"];
+            NSString *ellekitPath = [[NSBundle mainBundle].bundlePath
+                stringByAppendingPathComponent:(roothideMode ? @"ellekit_roothide.deb" : @"ellekit.deb")];
+            NSString *ellekitAltPath = [[NSBundle mainBundle].bundlePath
+                stringByAppendingPathComponent:(roothideMode ? @"ellekit.deb" : @"ellekit_roothide.deb")];
             int r = [self installPackage:ellekitPath];
-            if (r != 0) return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedFinalising userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to install ElleKit: %d\n", r]}];
+            if (r != 0) {
+                [[EUUIManager sharedInstance] sendLog:@"ElleKit 变体被拒，回退另一架构变体…" debug:NO];
+                int r2 = [self installPackage:ellekitAltPath];
+                if (r2 != 0) return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedFinalising userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to install ElleKit (both variants): %@=%d %@=%d\n", ellekitPath.lastPathComponent, r, ellekitAltPath.lastPathComponent, r2]}];
+            }
         }
 
         if (shouldInstallLaunchctl) {

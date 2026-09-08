@@ -16,7 +16,6 @@
 #define EUFS_DIRUTILS_H
 
 #import <stdint.h>
-#import <stddef.h>
 
 typedef struct {
 	uint64_t bytes; // apparent bytes of all regular files

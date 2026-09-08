@@ -1,9 +1,6 @@
 #ifndef JBROOT_H
 #define JBROOT_H
 
-#include <string.h>
-#include <limits.h>
-
 extern char *_Nullable get_jbroot(void);
 
 // Partially adapted from libroot for consistency

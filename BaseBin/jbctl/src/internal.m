@@ -7,15 +7,6 @@
 
 SInt32 CFUserNotificationDisplayAlert(CFTimeInterval timeout, CFOptionFlags flags, CFURLRef iconURL, CFURLRef soundURL, CFURLRef localizationURL, CFStringRef alertHeader, CFStringRef alertMessage, CFStringRef defaultButtonTitle, CFStringRef alternateButtonTitle, CFStringRef otherButtonTitle, CFOptionFlags *responseFlags) API_AVAILABLE(ios(3.0));
 
-// 构建修复：原处传 Objective-C block 给 C 函数指针参数（rootful_fakefs_run），
-// clang 拒绝；改为静态 C 函数，行为等价（逐行打印 + 刷 stdout）。
-static void jbctl_fakefs_progress_cb(const char *line, void *ctx)
-{
-        (void)ctx;
-        printf("%s\n", line);
-        fflush(stdout);
-}
-
 void execute_unsandboxed(void (^block)(void))
 {
         uint64_t credBackup = 0;
@@ -108,38 +99,38 @@ int jbctl_handle_internal(const char *command, int argc, char* argv[])
                 mach_port_t *selfInitPorts = NULL;
                 mach_msg_type_number_t selfInitPortsCount = 0;
                 if (mach_ports_lookup(mach_task_self(), &selfInitPorts, &selfInitPortsCount) != 0) {
-                        printf("ERROR: Failed port lookup on self\n");
+                        printf("[jbctl] ERROR: Failed port lookup on self\n");
                         return -1;
                 }
                 if (selfInitPortsCount < 3) {
-                        printf("ERROR: Unexpected initports count on self\n");
+                        printf("[jbctl] ERROR: Unexpected initports count on self\n");
                         return -1;
                 }
                 if (selfInitPorts[2] == MACH_PORT_NULL) {
-                        printf("ERROR: Port to stash not set\n");
+                        printf("[jbctl] ERROR: Port to stash not set\n");
                         return -1;
                 }
 
-                printf("Port to stash: %u\n", selfInitPorts[2]);
+                printf("[jbctl] Port to stash: %u\n", selfInitPorts[2]);
 
                 mach_port_t launchdTaskPort;
                 if (task_for_pid(mach_task_self(), 1, &launchdTaskPort) != 0) {
-                        printf("task_for_pid on launchd failed\n");
+                        printf("[jbctl] task_for_pid on launchd failed\n");
                         return -1;
                 }
                 mach_port_t *launchdInitPorts = NULL;
                 mach_msg_type_number_t launchdInitPortsCount = 0;
                 if (mach_ports_lookup(launchdTaskPort, &launchdInitPorts, &launchdInitPortsCount) != 0) {
-                        printf("mach_ports_lookup on launchd failed\n");
+                        printf("[jbctl] mach_ports_lookup on launchd failed\n");
                         return -1;
                 }
                 if (launchdInitPortsCount < 3) {
-                        printf("ERROR: Unexpected initports count on launchd\n");
+                        printf("[jbctl] ERROR: Unexpected initports count on launchd\n");
                         return -1;
                 }
                 launchdInitPorts[2] = selfInitPorts[2]; // Transfer port to launchd
                 if (mach_ports_register(launchdTaskPort, launchdInitPorts, launchdInitPortsCount) != 0) {
-                        printf("ERROR: Failed stashing port into launchd\n");
+                        printf("[jbctl] ERROR: Failed stashing port into launchd\n");
                         return -1;
                 }
                 mach_port_deallocate(mach_task_self(), launchdTaskPort);
@@ -172,8 +163,8 @@ int jbctl_handle_internal(const char *command, int argc, char* argv[])
                         const char *extra = NULL;
                         if (!strcmp(sub, "purge")) {
                                 if (argc < 3 || strcmp(argv[2], "--confirm") != 0) {
-                                        printf("Refusing to purge: this DESTROYS all rootful volumes and their contents.\n");
-                                        printf("If you really want this, run: jbctl internal rootful purge --confirm\n");
+                                        printf("[jbctl] Refusing to purge: this DESTROYS all rootful volumes and their contents.\n");
+                                        printf("[jbctl] If you really want this, run: jbctl internal rootful purge --confirm\n");
                                         return 1;
                                 }
                                 extra = "--confirm";
@@ -183,14 +174,17 @@ int jbctl_handle_internal(const char *command, int argc, char* argv[])
                         for (int i = 0; allowed[i]; i++) ok = ok || !strcmp(sub, allowed[i]);
                         if (ok) {
                                 char err[192] = { 0 };
-                                // 构建修复：block 不能转换为 C 函数指针，改为静态 C 函数
                                 int r = rootful_fakefs_run(sub, extra,
-                                        jbctl_fakefs_progress_cb, NULL, err, sizeof(err));
-                                if (r != 0 && err[0]) printf("ERROR: %s\n", err);
+                                        ^(const char *line, void *ctx) {
+                                                (void)ctx;
+                                                printf("[jbctl] %s\n", line);
+                                                fflush(stdout);
+                                        }, NULL, err, sizeof(err));
+                                if (r != 0 && err[0]) printf("[jbctl] ERROR: %s\n", err);
                                 return r;
                         }
                 }
-                printf("Usage: jbctl internal rootful <status|enable|recover|disable|rollback|purge [--confirm]>\n");
+                printf("[jbctl] Usage: jbctl internal rootful <status|enable|recover|disable|rollback|purge [--confirm]>\n");
                 return -1;
         }
         else if (!strcmp(command, "fakelib")) {

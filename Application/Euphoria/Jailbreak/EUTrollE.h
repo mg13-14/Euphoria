@@ -61,11 +61,17 @@ typedef NS_ENUM(NSInteger, EUTrollEInstallMode) {
 ///   + 11:42:25/52 双态澄清 + 11:44:59 精确域定案
 ///   + 11:47:32 build 级勘误"16.6.1到17.0中间有很多个本来支持巨魔的"）】
 /// 用户定案原文："未越狱的巨魔E范围ios14.0到ios18.7.1,A12到A13"
-/// → 未越狱（Engine B/C）：iOS 14.0 ~ 18.7.1，设备 A12 ~ A13，三档按 build 精确分层：
+/// 【R35 域修订（用户 2026-09-05 00:09:31 定案）："我现在只要支持A12~A13
+///   ios15.0~ios18.7.1,ios26.0~ios26.0.1"——下限 14.0→15.0（14.x 砍出承诺域），
+///   显式并入 26.0~26.0.1（DarkSword 会话窗）。新承诺域=DarkSword 会话域全重合，
+///   引擎B 为全域主力；15.0~16.7RC+17.0 CT 永久档为域内白送档。14.x CT 能力保留在
+///   代码（超集无害），但对外承诺/验收/文档一律以 R35 域为准。】
+/// → 未越狱（Engine B/C）：iOS 15.0 ~ 18.7.1 ＋ 26.0 ~ 26.0.1，设备 A12 ~ A13，三档按 build 精确分层：
 ///   ① 永久档（CT 存活，原版巨魔同域，不得降级进会话档）：
 ///      14.0b2~16.6.1 ＋ 16.7 b1~b6/16.7RC（20H18）＋ 17.0 各 build（第二 CT 段）
 ///      ——中间版本（16.7b/RC、17.0 全系）原本巨魔就支持，巨魔E 全收录保持永久档；
 ///   ② 会话/容器档：16.7.x 正式版（CT 修复首发 20H19 死区）＋ 17.0.1~18.7.1
+///      ＋ 26.0~26.0.1（R35 显式并入；DarkSword 声明窗内）
 ///      （DarkSword 一次性会话可装；重启持久化=非 CT 向量攻坚线未定，
 ///       re-arm 依赖正常签名渠道保活=B26 L2；L1 容器兜底）；
 ///   ③ PC 辅助子模式：16.7b/RC/17.0 设备端 kfd 装法死（arm64e 16.6.2+）
@@ -106,6 +112,15 @@ typedef NS_ENUM(NSInteger, EUTrollEInstallMode) {
 /// 卸载巨魔E 安装的应用（删除 .app + 移除重放表条目；TC 条目随重启自然失效）。
 - (BOOL)uninstallApplicationWithBundleID:(NSString *)bundleID
                                    error:(NSError *_Nullable *_Nullable)error;
+
+/// 插件注入（用户 2026-09-07 20:55 指令"插件注入功能"；TrollFools 同构）：
+/// 把 dylib 复制进目标 App 的 .app 根目录并追加 LC_LOAD_DYLIB（ChOma 重签链）。
+/// 域口径：14.0~17.0 CT 域免越狱可用；17.0.1+ 越狱态（引擎A 会话内）。
+/// ⚠️ 引擎本体由 A/B 线落地（UI/选择流已先行完整）——落地前调用返回
+/// EUError 域的"注入引擎接线中"错误，不静默假成功。
+- (BOOL)injectDylibAtURL:(NSURL *)dylibURL
+          intoApplication:(NSString *)bundleID
+                   error:(NSError *_Nullable *_Nullable)error;
 
 /// 已安装的巨魔E 应用清单（重放表内容）。
 - (NSArray<NSDictionary<NSString *, id> *> *)installedApplications;

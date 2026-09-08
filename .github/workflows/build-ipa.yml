@@ -1,0 +1,80 @@
+# GitHub Actions —— Euphoria/巨魔E 自动构建 IPA/TIPA
+#
+# 用户 2026-09-08 19:17 指令："直接用 GitHub 生成 ipa，把现在能给我的给我"。
+# 用法：本仓库推上 GitHub 后（需 GitHub 账号+PAT——注册被 DataDome IP 墙所阻，
+# 等管理员提供现成账号，或用户提供），本文件随源码树 push 即生效：
+#   · 手动触发：Actions 页选 "build-ipa" → Run workflow
+#   · 自动触发：打 tag（v*）即构建并挂 Release
+# 产物（Artifacts/Release 附件，网页直接下载）：
+#   · TrollE-Installer.tipa / .ipa（巨魔E 安装器——CT/巨魔通道与侧载双通道）
+#   · Euphoria.tipa（巨魔E 本体——主 App，随包可内嵌安装器 payload）
+#
+# Runner：macos-latest（自带 Xcode+iOS SDK；私有仓免费 2000 分钟/月）。
+# ⚠️ Codeberg（Woodpecker CI）无 macOS runner——iOS 构建只能走 GitHub Actions
+#   或本地 Mac，这是选 GitHub 做构建载体的技术原因。
+#
+# 落码：并行搜索员C，2026-09-08。
+
+name: build-ipa
+
+on:
+  workflow_dispatch: {}          # 手动触发
+  push:
+    tags: ['v*']                 # 打 tag 自动构建+Release
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 依赖（ldid/dpkg）
+        run: |
+          brew install ldid dpkg || true
+          xcodebuild -version
+          xcrun -sdk iphoneos -show-sdk-version
+
+      # ① 巨魔E 安装器（独立工程五步链：ChOma→libjailbreak→Exploits→src→装配）
+      - name: 构建 TrollE-Installer（.tipa/.ipa）
+        run: |
+          cd TrollE-Installer
+          make
+          ls -la build/
+
+      # ② 巨魔E 本体（主 App：BaseBin→Packages→Application→Euphoria.tipa）
+      #    并把本体投放安装器 payload/（安装器"内置巨魔E"随包）
+      - name: 构建 Euphoria 本体（.tipa）+ 投放安装器 payload
+        id: build-main
+        run: |
+          make trolle-payload || echo "::warning::主树构建失败（见日志）——安装器仍已产出"
+          ls -la Application/*.tipa 2>/dev/null || true
+          ls -la TrollE-Installer/payload/ 2>/dev/null || true
+
+      # ③ 带 payload 的安装器重打（若②成功）——最终"内置巨魔E"安装器
+      - name: 重打安装器（含内置巨魔E 本体）
+        if: steps.build-main.outcome == 'success'
+        run: |
+          if [ -f TrollE-Installer/payload/Euphoria.tipa ]; then
+            cd TrollE-Installer && make
+          fi
+
+      - name: 上传产物（Artifacts）
+        uses: actions/upload-artifact@v4
+        with:
+          name: Euphoria-builds
+          path: |
+            TrollE-Installer/build/*.tipa
+            TrollE-Installer/build/*.ipa
+            Application/Euphoria.tipa
+          if-no-files-found: error
+
+      - name: 挂 Release（仅 tag 触发）
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            TrollE-Installer/build/*.tipa
+            TrollE-Installer/build/*.ipa
+            Application/Euphoria.tipa

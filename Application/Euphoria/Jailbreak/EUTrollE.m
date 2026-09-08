@@ -18,6 +18,7 @@
 #import <choma/Fat.h>
 #import <choma/MachO.h>
 #import <choma/CSBlob.h>
+#import <UIKit/UIKit.h>
 #import <dlfcn.h>
 #import <sys/sysctl.h>
 #import <string.h>
@@ -168,8 +169,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     NSString *appBundlePath = nil;
 
     // ① 解包（.ipa → 暂存目录；.app 直接用）
-    // 构建修复：带参方法不能用点语法，改消息发送
-    if ([appURL.pathExtension caseInsensitiveCompare:@"ipa"] == NSOrderedSame) {
+    if ([appURL.pathExtension.caseInsensitiveCompare:@"ipa"] == NSOrderedSame) {
         NSString *unzipPath = JBROOT_PATH(@"/usr/bin/unzip");
         if (![[NSFileManager defaultManager] isExecutableFileAtPath:unzipPath]) {
             if (error) *error = fail(EUTrollEErrorCodeUnzipMissing, @"缺少 unzip（请先在包管理器中安装 unzip 包，Procursus 源提供）");
@@ -199,7 +199,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
             }
         }
     }
-    else if ([appURL.pathExtension caseInsensitiveCompare:@"app"] == NSOrderedSame) {
+    else if ([appURL.pathExtension.caseInsensitiveCompare:@"app"] == NSOrderedSame) {
         appBundlePath = appURL.path;
     }
 
@@ -238,7 +238,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
 
     // ④ 拷入 /var/jb/Applications（root）
     __block BOOL copied = NO;
-    NSString *destPath = JBROOT_PATH(([NSString stringWithFormat:@"/Applications/%@", appBundlePath.lastPathComponent]));
+    NSString *destPath = JBROOT_PATH([NSString stringWithFormat:@"/Applications/%@", appBundlePath.lastPathComponent]);
     [[EUEnvironmentManager sharedManager] runAsRoot:^{
         [[NSFileManager defaultManager] removeItemAtPath:destPath error:nil];
         copied = [[NSFileManager defaultManager] copyItemAtPath:appBundlePath toPath:destPath error:nil];
@@ -249,8 +249,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     }
 
     // ⑤ uicache 刷新图标
-    // 构建修复：JBROOT_PATH 宏返回 char*，不能再取 .fileSystemRepresentation
-    int r = exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"),
+    int r = exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache").fileSystemRepresentation,
                              "-p", destPath.fileSystemRepresentation, NULL);
     if (r != 0) {
         EUTrolleLog(@"巨魔E：uicache 返回 %d（图标可能需注销后出现）", r);
@@ -263,7 +262,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
         @"bundleID" : bundleID,
         @"path" : destPath,
         @"cdhash" : cdhashHex,
-        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
+        @"installedAt" : [[NSDate date] timeIntervalSince1970],
     }];
     [self saveEntries:entries];
 
@@ -303,7 +302,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     [entries filterUsingPredicate:[NSPredicate predicateWithFormat:@"bundleID != %@", bundleID]];
     [self saveEntries:entries];
 
-    exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"), "-u", [target[@"path"] stringByDeletingLastPathComponent].fileSystemRepresentation, NULL);
+    exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache").fileSystemRepresentation, "-u", [target[@"path"] stringByDeletingLastPathComponent].fileSystemRepresentation, NULL);
     return removed;
 }
 
@@ -317,7 +316,10 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
 {
     NSOperatingSystemVersion v = [NSProcessInfo processInfo].operatingSystemVersion;
     if (v.majorVersion > 17) return NO;
-    if (v.majorVersion == 17) return (v.minorVersion == 0); // 17.0 全系
+    // 2026-09-06 C 修复（kimik3 清单⑬，同步 B 线 Standalone 版）：17.0.1+
+    // （minor≥1 或 patch≥1，如 17.0.1/17.0.2/17.1）CT 已修=域外；原判定
+    // `minorVersion == 0` 会把 17.0.1~17.0.3（20A→21A 系）误判为域内。
+    if (v.majorVersion == 17) return (v.minorVersion == 0 && v.patchVersion == 0);
     if (v.minorVersion == 7) { // 16.7.x：仅 RC（20H18）在 CT 域
         char osversion[32] = {0};
         size_t len = sizeof(osversion) - 1;
@@ -724,16 +726,7 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
                                   [NSCharacterSet URLQueryAllowedCharacterSet]]];
             NSURL *url = [NSURL URLWithString:handoff];
             if (url) {
-                // 此文件同时编译进 BaseBin/euphoria CLI（无 UIKit），
-                // 运行时解析 UIApplication，避免链接期缺符号（仅构建修复）
-                Class uiAppCls = NSClassFromString(@"UIApplication");
-                if (uiAppCls) {
-                    id app = ((id (*)(id, SEL))objc_msgSend)((id)uiAppCls, sel_registerName("sharedApplication"));
-                    if (app) {
-                        ((void (*)(id, SEL, NSURL *, NSDictionary *, id))objc_msgSend)(
-                            app, sel_registerName("openURL:options:completionHandler:"), url, @{}, nil);
-                    }
-                }
+                [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
                 EUTrolleLog(@"巨魔E：本体在位，已移交安装 → %@", appURL.lastPathComponent);
                 if (error) *error = nil;
                 return YES;
@@ -839,10 +832,9 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
     // <App>.app），原 installd 迁移后的 UUID 目录扫描已不需要
     NSString *bundleID = info[@"CFBundleIdentifier"] ?: appBundlePath.lastPathComponent;
 
-    // Persistence Helper：同本体第二槽位安装（TrollStore 2"本体兼 helper"模式；
-    // helper 负责 respring/图标缓存重载后的签名态恢复——C23 实证必要性）
-    EUTrolleLog(@"巨魔E：安装 Persistence Helper（第二槽位）…");
-    [self eutrolle_installPersistenceHelperFromBundle:appBundlePath];
+    // B25-3 复核修订：删除"第二槽位 helper"——MCMAppContainer 按 bundleID 寻址，同 ID 副本
+    // 必收敛回本体容器（幽灵目录+本体自覆盖风险）；本体兼 helper 语义由本体 CT 永签+URL scheme
+    // 自身承担（快路径②本体在位即接管安装），TrollStore 2 实际机制同理，无需第二副本。
 
     // ⑦ 登记重放表（与引擎A 同表；后续越狱时 Engine A 幂等重放信任缓存）
     NSMutableArray *newEntries = [entries mutableCopy];
@@ -852,7 +844,7 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
         @"cdhash" : cdhashHex,
         @"role" : @"body",           // 引擎B 装出的首个应用=巨魔E 本体
         @"engine" : @"B",            // 来源标记（A/B 互不冲突）
-        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
+        @"installedAt" : [[NSDate date] timeIntervalSince1970],
     }];
     // 保存此时进程为 root，直接落盘（无 runAsRoot 依赖——那是越狱态通道）
     NSString *registryDir = [[EUTrollE registryPath] stringByDeletingLastPathComponent];
@@ -866,30 +858,6 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
     return YES;
 }
 
-/// Persistence Helper 安装：将本体 .app 复制到第二容器槽位（root 直拷+installd 注册）。
-/// 简化实现（TrollStore 2 同款语义）：helper=本体自身第二副本，重装/自愈由其 UI 承担。
-- (void)eutrolle_installPersistenceHelperFromBundle:(NSString *)appBundlePath
-{
-    @try {
-        NSString *helperUUID = [[NSUUID UUID] UUIDString];
-        NSString *helperDir = [@"/var/containers/Bundle/Application" stringByAppendingPathComponent:helperUUID];
-        NSString *helperApp = [helperDir stringByAppendingPathComponent:appBundlePath.lastPathComponent];
-        if ([[NSFileManager defaultManager] createDirectoryAtPath:helperDir withIntermediateDirectories:YES attributes:nil error:nil]) {
-            if ([[NSFileManager defaultManager] copyItemAtPath:appBundlePath toPath:helperApp error:nil]) {
-                EUTrollEPermasignInstall(helperApp, NULL, NULL); // CT 注册（失败不阻塞主流程；helper 缺失仅影响图标缓存重载自愈）
-                NSMutableArray *entries = [[self installedApplications] mutableCopy];
-                [entries addObject:@{@"bundleID" : @"dev.euphoria.trolle.helper",
-                                     @"path" : helperApp,
-                                     @"cdhash" : @"",        // 与本体同二进制：重放时按本体 cdhash 复用
-                                     @"role" : @"helper",
-                                     @"engine" : @"B"}];
-                [self saveEntries:entries];
-            }
-        }
-    } @catch (NSException *e) {
-        EUTrolleLog(@"巨魔E：helper 安装异常（不阻塞）——%@", e);
-    }
-}
 
 #pragma mark 引擎C：容器模式安装侧（B26 L1 基线，无漏洞全版本域）
 
@@ -964,7 +932,7 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
         @"role" : @"guest",           // 容器内访客应用
         @"engine" : @"C",
         @"container" : uuid,          // 启动引用：euphoria-trolle://launch?id=<uuid>
-        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
+        @"installedAt" : [[NSDate date] timeIntervalSince1970],
     }];
     [self saveEntries:entries];
 

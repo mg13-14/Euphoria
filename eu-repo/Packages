@@ -1,16 +1,146 @@
 Package: dev.euphoria.trolle-installer
-Version: 0.9.1
+Version: 0.9.1-4
 Architecture: iphoneos-arm64
 Maintainer: Euphoria Project
-Depends: euphoria-basebin-link
-Filename: pool/main/dev.euphoria.trolle-installer_0.9.1_iphoneos-arm64.deb
-Size: 1692
-MD5sum: e3b346eb38d0341e9b934704aafcfda9
-SHA1: a63a008b6d9135946dcfab70abf966fb59fce9ea
-SHA256: b20d1c08a8d6d13c2c4e647bc475101484d4c886840669a6214e8f6bbfd8369a
+Installed-Size: 49364
+Filename: pool/main/dev.euphoria.trolle-installer_0.9.1-4_iphoneos-arm64.deb
+Size: 21517744
+MD5sum: 563f8776a8f1af2fed2a4724a99d22c5
+SHA1: 9b856b2ce55a85c02ef7783d306bac267e800a8d
+SHA256: 68d3b3ebf3abdee76af3476c17acb1bed35a5f3d387b7a2e096ef1aabae10486
 Section: System
 Priority: optional
 Homepage: https://github.com/euphoria-jb/Euphoria
-Description: 巨魔E（TrollStore E）安装器——自研永久签名安装器本体。越狱态引擎开箱即用（信任缓存秒装）；免越狱引擎随版本接入。装出本体脱狱独立常驻，不依赖 Euphoria App。
+Description: 巨魔E（TrollStore E）安装器——完整源码分发包（B 线 09-04 真件，替换旧空壳包）。
+ 载荷=完整自包含源码树：src（引擎B/C 门面+UI）/ Exploits（8+1 向量，momentarius
+ 断默认接线）/ vendor（ChOma+libjailbreak+私有头快照）/ Makefile / BUILD.md / README，
+ 安装到 /var/jb/usr/share/TrollE-Installer/。
+ .
+ 构建需 macOS 13+ / Xcode 15+ / ldid（包内 BUILD.md 五步链）；产物
+ TrollE-Installer.tipa / .ipa / .deb 由 Mac 侧构建产出后以新版本号替换本包。
+ 越狱态引擎A（信任缓存秒装）与免越狱引擎B（漏洞会话+CT 永久签名，≤16.x/17+
+ root 化双分支）/ 引擎C（容器兜底）机制详见包内 README。
 Author: Euphoria Project
 Name: TrollE (巨魔E) Installer
+
+Package: dev.euphoria.trolle-installer
+Version: 0.9.1-5
+Architecture: all
+Maintainer: Euphoria Project
+Filename: pool/main/dev.euphoria.trolle-installer_0.9.1-5_all.deb
+Size: 21517708
+MD5sum: e49a9859e80eb69c7a06bb713b0593b9
+SHA1: 320f7ea1c7883128501bb9cab561bf5d08f0cfaf
+SHA256: 23a2973eea9337efb15948f472f3046eca2ba04aa8eee455ab5442029fa466c5
+Section: System
+Priority: optional
+Homepage: https://github.com/euphoria-jb/Euphoria
+Description: 巨魔E（TrollStore E）安装器——独立源码项目版（TrollE-Installer/）。
+ 越狱态：本 deb 装入 /var/jb，等价主树引擎 B/C 入口。
+ 免越狱态：经侧载 IPA（AltStore/SideStore）运行，CT 域内跑一次性漏洞会话装出本体，
+ 本体脱狱独立常驻。装出后不依赖 Euphoria App、不依赖本安装器。
+ .
+ 依赖说明：本包已去除 euphoria-basebin-link 依赖（源骨架 trolle-installer v0.9.1 的
+ 越狱态硬依赖在独立版不复存在——libjailbreak/choma 以静态链接随包携带）。
+Author: Euphoria Project
+Name: TrollE (巨魔E) Installer Standalone
+
+Package: dev.euphoria.trolle-installer
+Version: 0.9.1-6
+Architecture: all
+Maintainer: Euphoria Project
+Filename: pool/main/dev.euphoria.trolle-installer_0.9.1-6_all.deb
+Size: 520476
+MD5sum: 758b582457ff85a57a5fa3f4eab245bc
+SHA1: b63b3dcc8191729517b9c0d4c2c21b8f3d77dd87
+SHA256: 7fcfb5620bd7178b794353727a16811335dddf4609da2e8f05056ba333460523
+Section: System
+Priority: optional
+Homepage: https://github.com/euphoria-jb/Euphoria
+Description: 巨魔E（TrollStore E）安装器——独立源码项目版（TrollE-Installer/）。
+ 越狱态：本 deb 装入 /var/jb，等价主树引擎 B/C 入口。
+ 免越狱态：经侧载 IPA（AltStore/SideStore）运行，CT 域内跑一次性漏洞会话装出本体，
+ 本体脱狱独立常驻。装出后不依赖 Euphoria App、不依赖本安装器。
+ .
+ 依赖说明：本包已去除 euphoria-basebin-link 依赖（源骨架 trolle-installer v0.9.1 的
+ 越狱态硬依赖在独立版不复存在——libjailbreak/choma 以静态链接随包携带）。
+Author: Euphoria Project
+Name: TrollE (巨魔E) Installer Standalone
+
+Package: dev.euphoria.trolle-installer
+Version: 0.9.1-7
+Architecture: all
+Maintainer: Euphoria Project
+Filename: pool/main/dev.euphoria.trolle-installer_0.9.1-7_all.deb
+Size: 523498
+MD5sum: de97ba7913a8ac14d779a1c1a9102fa9
+SHA1: 2ab7b3299315a47956dffa2e73218a1fe601ee94
+SHA256: 9e15e484e9e2fa18824c4a0871f1fd3eaf118b8e156e00b4a085799b4df29b5c
+Section: System
+Priority: optional
+Homepage: https://github.com/euphoria-jb/Euphoria
+Description: 巨魔E（TrollStore E）安装器——独立源码项目版（TrollE-Installer/）。
+ 越狱态：本 deb 装入 /var/jb，等价主树引擎 B/C 入口。
+ 免越狱态：经侧载 IPA（AltStore/SideStore）运行，CT 域内跑一次性漏洞会话装出本体，
+ 本体脱狱独立常驻。装出后不依赖 Euphoria App、不依赖本安装器。
+ .
+ 依赖说明：本包已去除 euphoria-basebin-link 依赖（源骨架 trolle-installer v0.9.1 的
+ 越狱态硬依赖在独立版不复存在——libjailbreak/choma 以静态链接随包携带）。
+Author: Euphoria Project
+Name: TrollE (巨魔E) Installer Standalone
+
+Package: dev.euphoria.trolle-installer
+Version: 0.9.1-8
+Architecture: all
+Maintainer: Euphoria Project
+Filename: pool/main/dev.euphoria.trolle-installer_0.9.1-8_all.deb
+Size: 524068
+MD5sum: 00a264f1b25142984256f2dd96d62b85
+SHA1: b968fdce289625d345d5f4ff662caecf22a3f680
+SHA256: 1312cc3e6c78404e2965abe03c6502677ccb2f8a20e598e05fc29540c0098c8a
+Section: System
+Priority: optional
+Homepage: https://github.com/euphoria-jb/Euphoria
+Description: 巨魔E（TrollStore E）安装器——源码存档包（var/jb 数据段，Mac 构建用；装上无桌面图标属正常）。
+ 越狱态：本 deb 装入 /var/jb，等价主树引擎 B/C 入口。
+ 免越狱态：经侧载 IPA（AltStore/SideStore）运行，CT 域内跑一次性漏洞会话装出本体，
+ 本体脱狱独立常驻。装出后不依赖 Euphoria App、不依赖本安装器。
+ .
+ 依赖说明：本包已去除 euphoria-basebin-link 依赖（源骨架 trolle-installer v0.9.1 的
+ 越狱态硬依赖在独立版不复存在——libjailbreak/choma 以静态链接随包携带）。
+Author: Euphoria Project
+Name: TrollE (巨魔E) Installer Standalone
+
+Package: euphoria-basebin-link
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Maintainer: opa334 <opa334@protonmail.com>
+Provides: opainject
+Filename: pool/main/euphoria-basebin-link_1.0.0_iphoneos-arm64.deb
+Size: 790
+MD5sum: 42929849bc547207168c4981e32f24ff
+SHA1: bd954ce46ef7fe6c39796c922112d8c0df1c3ef6
+SHA256: e4477270cedf525d7040460475364bec5b3bf3caa2d1dfd4aa769993b969254b
+Section: Libraries
+Priority: standard
+Homepage: https://github.com/euphoria-jb/Euphoria/tree/main/BaseBin
+Description: Symlinks to Euphoria Base Binaries
+Author: opa334 <opa334@protonmail.com>
+Name: Euphoria BaseBin Link
+
+Package: launchctl
+Version: 1:1.2.0
+Architecture: iphoneos-arm64
+Essential: yes
+Maintainer: Procursus Team <support@procurs.us>
+Installed-Size: 152
+Depends: libiosexec1 (>= 1.3.1)
+Filename: pool/main/launchctl_1_1.2.0_iphoneos-arm64.deb
+Size: 51976
+MD5sum: b23c53f036cd3c34d65d5b5ef56aac86
+SHA1: 4fd8ed5d2f27c1144fbae8107b98017aedd21eea
+SHA256: b8f715bc0cbccae2adac1d208707c760130568fbc3387054f4c981564bdd8bda
+Section: System
+Priority: required
+Homepage: https://github.com/ProcursusTeam/launchctl
+Description: Tells launchd what to do

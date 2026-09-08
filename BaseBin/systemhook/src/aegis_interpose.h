@@ -17,8 +17,10 @@
  *     artefacts by aegis_path_is_jailbreak_artefact()
  *   - posix_spawn / posix_spawnp: strip DYLD_INSERT_LIBRARIES and the
  *     other injection env vars from the child environment
- *   - getfsent / getmntinfo / getfsstat64: hide jailbreak-related mounts
- *     (complementary to cloak, applied only to shielded apps)
+ *   - getfsstat: hide jailbreak-related mounts from shielded apps
+ *     (complementary to cloak; B25-5: getfsent/getfsstat64 dropped —
+ *     getfsent(3) is the fstab family and absent on iOS, the *64
+ *     statfs family is __IPHONE_NA on arm64)
  *
  * Credential scrubbing (sysctl KERN_PROC) is intentionally NOT done here:
  * cloak already hides credentials system-wide when cloakHideCredentials

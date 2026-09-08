@@ -2,25 +2,39 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <array>
-	<dict>
-		<key>Display Name</key>
-		<string>Sileo</string>
-		<key>Key</key>
-		<string>org.coolstar.SileoStore</string>
-		<key>Icon</key>
-		<string>Sileo</string>
-		<key>Package</key>
-		<string>sileo.deb</string>
-	</dict>
-	<dict>
-		<key>Display Name</key>
-		<string>Zebra</string>
-		<key>Key</key>
-		<string>xyz.willy.Zebra</string>
-		<key>Icon</key>
-		<string>Zebra</string>
-		<key>Package</key>
-		<string>zebra.deb</string>
-	</dict>
+        <dict>
+                <key>Display Name</key>
+                <string>Sileo</string>
+                <key>Key</key>
+                <string>org.coolstar.SileoStore</string>
+                <key>Icon</key>
+                <string>Sileo</string>
+                <key>Package</key>
+                <string>sileo.deb</string>
+        </dict>
+        <dict>
+                <key>Display Name</key>
+                <string>Zebra</string>
+                <key>Key</key>
+                <string>xyz.willy.Zebra</string>
+                <key>Icon</key>
+                <string>Zebra</string>
+                <key>Package</key>
+                <string>zebra.deb</string>
+        </dict>
+        <!-- EPM（自研包管理器·T18 契约 v1 内嵌形态）——Package 留空 =
+             无外部 deb，勾选仅入偏好；入口=主 App 菜单 EPM 仙市页；
+             EUBootstrapper 对空 Package 跳过安装（C 2026-09-05 接入）。
+             Icon=EPM 资产不存在时由 PickerView 系统图标兜底。 -->
+        <dict>
+                <key>Display Name</key>
+                <string>EPM（自研·仙市）</string>
+                <key>Key</key>
+                <string>dev.euphoria.EPM</string>
+                <key>Icon</key>
+                <string>EPM</string>
+                <key>Package</key>
+                <string></string>
+        </dict>
 </array>
 </plist>

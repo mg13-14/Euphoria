@@ -19,22 +19,71 @@
 #include <sys/proc_info.h>
 #include <sys/syscall.h>
 #include <mach-o/dyld.h>
+#include <mach/mach.h>
+#include <ptrauth.h>
 
 #include "litehook.h"
-
-// 构建修复：iOS SDK 的 sys/sysctl.h 未定义以下两个 KERN_PROC 选择器，补 fallback 值
-#ifndef KERN_PROC_PIDINFO
-#define KERN_PROC_PIDINFO 17
-#endif
-#ifndef KERN_PROC_TBSDINFO
-#define KERN_PROC_TBSDINFO 18
-#endif
 
 cloak_policy_cache_t gCloakPolicy = { 0 };
 
 static bool gCloakPathInitialized = false;
 static char gJbrootMountPoint[MAXPATHLEN] = { 0 };
 static char gBindMountPoint[MAXPATHLEN] = { 0 };
+
+/* ------------------------------------------------------------------------ */
+/* "orig" trampolines (B25-5 fix)                                            */
+/*                                                                          */
+/* litehook entry patches are absolute x16 jumps with no built-in            */
+/* trampoline, therefore a hook that calls the patched libc symbol           */
+/* directly recurses forever (hook -> patch -> hook ...).  The original      */
+/* implementation of the four mount/credential hooks did exactly that.      */
+/*                                                                          */
+/* This mirrors the proven orig-trampoline pattern from                      */
+/* common/hookd_external.c (frida _pthread_create orig):                    */
+/*   - copy the target's first 5 instructions (assumed PC-independent,      */
+/*     same assumption the in-tree frida orig makes) into executable        */
+/*     storage,                                                                  */
+/*   - patch storage[5] to jump to target+20 (hooking storage[5] has the    */
+/*     side effect of flipping the whole page RX on both the iOS 15         */
+/*     default litehook path and the iOS 16+ hookd path),                    */
+/*   - hand the storage pointer out as the "orig" to call from the hook.    */
+/*                                                                          */
+/* The storage lives in a dedicated __TEXT section so it is executable from */
+/* load time; all writes go through litehook_hook_memory so both patch      */
+/* paths handle the unprotect/write/protect cycle.                          */
+/* Nested hooking (cloak + aegis hooking the same function) chains          */
+/* correctly because the entry patch jumps through an absolute x16 address  */
+/* that executes from any location.                                         */
+/* ------------------------------------------------------------------------ */
+
+#define CLOAK_MAX_TRAMPOLINES 4
+static uint32_t gCloakTrampolines[CLOAK_MAX_TRAMPOLINES][16] __attribute__((used, section("__TEXT,__cloaktramp")));
+static int gCloakTrampolineCount = 0;
+
+static void *cloak_make_orig_trampoline(void *fn)
+{
+        if (gCloakTrampolineCount >= CLOAK_MAX_TRAMPOLINES) return NULL;
+        uint32_t *tramp = gCloakTrampolines[gCloakTrampolineCount++];
+        void *fnUnsigned = ptrauth_strip(fn, ptrauth_key_function_pointer);
+
+        // Copy the original first 5 instructions into the trampoline via
+        // litehook (handles page protection on both patch paths).
+        kern_return_t kr = litehook_hook_memory(tramp, fnUnsigned, sizeof(uint32_t) * 5);
+        if (kr != KERN_SUCCESS) return NULL;
+
+        // Patch trampoline instruction 6 to jump back into the original
+        // function at instruction 6 (target + 20 bytes).
+        kr = litehook_hook_function(
+                ptrauth_sign_unauthenticated(&tramp[5], ptrauth_key_function_pointer, 0),
+                ptrauth_sign_unauthenticated((void *)((uintptr_t)fnUnsigned + sizeof(uint32_t) * 5), ptrauth_key_function_pointer, 0));
+        if (kr != KERN_SUCCESS) return NULL;
+
+        return ptrauth_sign_unauthenticated((void *)tramp, ptrauth_key_function_pointer, 0);
+}
+
+static int (*cloak_getfsstat_orig)(struct statfs *, int, int) = NULL;
+static int (*cloak_statfs_orig)(const char *, struct statfs *) = NULL;
+static int (*cloak_sysctl_orig)(const char *, u_int, void *, size_t *, void *, size_t) = NULL;
 
 /* ------------------------------------------------------------------------ */
 /* Policy                                                                    */
@@ -153,7 +202,10 @@ static bool cloak_mount_is_hidden(const char *mntonname)
 
 int getfsstat_hook(struct statfs *buf, int bufsize, int flags)
 {
-        int r = getfsstat(buf, bufsize, flags);
+        // B25-5 fix: call the saved orig trampoline instead of the patched
+        // libc symbol (direct call = infinite recursion).
+        if (!cloak_getfsstat_orig) return -1;
+        int r = cloak_getfsstat_orig(buf, bufsize, flags);
         if (r <= 0) return r;
 
         bool filter = gCloakPolicy.hideMounts && !cloak_process_is_trusted();
@@ -170,9 +222,12 @@ int getfsstat_hook(struct statfs *buf, int bufsize, int flags)
         return out;
 }
 
-// On arm64 iOS, statfs/getfsstat are already 64-bit and no separate
-// statfs64/getfsstat64 symbols exist in libSystem, so the 64-bit variants
-// are intentionally not hooked here.
+// B25-5 fix: getfsstat64/statfs64 hooks removed. On arm64/arm64e iOS the SDK
+// marks the *64 statfs family __IPHONE_NA (struct statfs already IS the
+// 64-bit layout via __DARWIN_STRUCT_STATFS64) and the arm64 dyld shared
+// cache does not export the *64 symbols, so hooking them can neither
+// compile nor link for this target. Apps on iOS use getfsstat/statfs,
+// which stay hooked.
 
 static int statfs_common(const char *path, int origRv, int *errnoOut)
 {
@@ -188,7 +243,9 @@ static int statfs_common(const char *path, int origRv, int *errnoOut)
 
 int statfs_hook(const char *path, struct statfs *buf)
 {
-        int r = statfs(path, buf);
+        // B25-5 fix: call the saved orig trampoline (direct call recurses).
+        if (!cloak_statfs_orig) { errno = ENOENT; return -1; }
+        int r = cloak_statfs_orig(path, buf);
         int e = errno;
         int filtered = statfs_common(path, r, &e);
         errno = e;
@@ -210,10 +267,12 @@ static void cloak_scrub_kinfo_proc(struct kinfo_proc *kproc)
                 if (hide) {
                         kproc->kp_eproc.e_ucred.cr_uid  = 501;
                         kproc->kp_eproc.e_ucred.cr_gid  = 501;
-                        // 构建修复：用户态 struct _ucred 无 cr_ruid/cr_rgid/cr_svuid/cr_svgid
-                        // 成员（内核私有），删去这四行赋值；真实/保存 uid 由下方 p_ruid 覆盖。
+                        kproc->kp_eproc.e_ucred.cr_ruid = 501;
+                        kproc->kp_eproc.e_ucred.cr_rgid = 501;
                         kproc->kp_eproc.e_pcred.p_ruid  = 501;
                         kproc->kp_eproc.e_pcred.p_rgid  = 501;
+                        kproc->kp_eproc.e_ucred.cr_svuid = 501;
+                        kproc->kp_eproc.e_ucred.cr_svgid = 501;
                         // A stock system process never carries all-zero groups.
                         kproc->kp_eproc.e_ucred.cr_ngroups = 1;
                         for (int g = 1; g < NGROUPS; g++) {
@@ -227,7 +286,9 @@ static void cloak_scrub_kinfo_proc(struct kinfo_proc *kproc)
 
 int sysctl_hook(const char *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 {
-        int r = sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+        // B25-5 fix: call the saved orig trampoline (direct call recurses).
+        if (!cloak_sysctl_orig) return -1;
+        int r = cloak_sysctl_orig(name, namelen, oldp, oldlenp, newp, newlen);
         if (r != 0) return r;
 
         if (!gCloakPolicy.hideCredentials) return r;
@@ -269,9 +330,22 @@ void cloak_interpose_init(void)
         cloak_reload_policy();
         if (!gCloakPolicy.enabled) return;
 
-        litehook_hook_function(getfsstat,   getfsstat_hook);
-        litehook_hook_function(statfs,      statfs_hook);
+        // B25-5 fix: build all orig trampolines BEFORE hooking (the prologue
+        // copy must see the unpatched instructions). If a trampoline cannot
+        // be built, skip that hook rather than install a recursing one.
+        cloak_getfsstat_orig = cloak_make_orig_trampoline((void *)getfsstat);
+        cloak_statfs_orig = cloak_make_orig_trampoline((void *)statfs);
+
+        if (cloak_getfsstat_orig) {
+                litehook_hook_function(getfsstat, getfsstat_hook);
+        }
+        if (cloak_statfs_orig) {
+                litehook_hook_function(statfs, statfs_hook);
+        }
         if (gCloakPolicy.hideCredentials) {
-                litehook_hook_function(sysctl, sysctl_hook);
+                cloak_sysctl_orig = cloak_make_orig_trampoline((void *)sysctl);
+                if (cloak_sysctl_orig) {
+                        litehook_hook_function(sysctl, sysctl_hook);
+                }
         }
 }
