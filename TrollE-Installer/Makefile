@@ -137,7 +137,13 @@ package: app
 	# 故后续递归 adhoc 签不会覆盖主二进制特权——与主树 Application/Makefile 同序）
 	ldid -SEntitlements.plist $(APP_DIR)/$(APP_NAME)
 	# 递归 adhoc 签全部嵌入 mach-o（frameworks/libjailbreak/libchoma）
-	ldid -s $(APP_DIR)
+	# 注：brew ldid 对目录形式 `-s` 会触发 flag_S 断言——逐文件签（与主树
+	# BaseBin/Makefile 同款姿势），同时兼容 Procursus ldid。
+	@for f in $$(find $(APP_DIR) -type f ! -name 'Info.plist' ! -name 'PkgInfo'); do \
+	    if file -b "$$f" | grep -q 'Mach-O'; then \
+	        [ "$$f" = "$(APP_DIR)/$(APP_NAME)" ] || ldid -s "$$f" || exit 1; \
+	    fi; \
+	done
 	rm -rf $(BUILD)/Payload $(BUILD)/$(APP_NAME).tipa $(BUILD)/$(APP_NAME).ipa
 	mkdir -p $(BUILD)/Payload
 	cp -R $(APP_DIR) $(BUILD)/Payload/

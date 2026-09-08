@@ -32,7 +32,13 @@ jobs:
 
       - name: 依赖（ldid/dpkg/libarchive）
         run: |
-          brew install ldid dpkg libarchive || true
+          brew install dpkg libarchive || true
+          # brew 版 ldid 对目录递归 `-s` 会触发 flag_S 断言；越狱工具链事实标准是
+          # Procursus ldid（主树 main.yml 同款），直接取官方预编译二进制。
+          curl -fsSL "https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macosx_arm64" -o /tmp/ldid
+          chmod +x /tmp/ldid
+          sudo mv /tmp/ldid /usr/local/bin/ldid
+          ldid -V || true
           xcodebuild -version
           xcrun -sdk iphoneos -show-sdk-version
 
