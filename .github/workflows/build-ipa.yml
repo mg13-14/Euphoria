@@ -69,6 +69,14 @@ jobs:
           make
           ls -la build/
 
+      - name: 探针（SDK 私有框架实况）
+        run: |
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          echo "SDK=$SDK"
+          ls "$SDK/System/Library/PrivateFrameworks/" | grep -i -E "symbolication|symbol" || echo "NO CoreSymbolication in iOS SDK"
+          ls "$SDK/System/Library/Frameworks/" | head -5 || true
+          ls ~/theos/sdks/ || true
+
       # ② 巨魔E 本体（主 App：BaseBin→Packages→Application→Euphoria.tipa）
       #    并把本体投放安装器 payload/（安装器"内置巨魔E"随包）
       - name: 构建 Euphoria 本体（.tipa）+ 投放安装器 payload
