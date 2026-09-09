@@ -2,6 +2,7 @@
 #define MACHO_SLICE_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <mach-o/fat.h>
 #include <mach-o/loader.h>
 #include "MemoryStream.h"

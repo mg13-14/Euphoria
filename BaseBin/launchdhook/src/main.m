@@ -11,6 +11,7 @@
 #import <sys/sysctl.h>
 #import <substrate.h>
 #include <sys/param.h>
+#include <stdint.h>
 #include <sys/mount.h>
 #include <kern_memorystatus.h>
 

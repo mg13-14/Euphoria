@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "MemoryStream.h"
 #include "Util.h"
 

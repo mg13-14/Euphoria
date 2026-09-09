@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "txm.h"
 
 #include "util.h"

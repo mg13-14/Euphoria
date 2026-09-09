@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "MachOLoadCommand.h"
 #include "Util.h"
 #include "CSBlob.h"

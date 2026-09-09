@@ -1,4 +1,5 @@
 #include <CoreFoundation/CoreFoundation.h>
+#include <stdint.h>
 #include <spawn.h>
 #include <xpc/xpc.h>
 #include "private.h"

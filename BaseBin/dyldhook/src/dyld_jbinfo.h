@@ -1,3 +1,4 @@
+#include <stdint.h>
 #define DYLD_JBINFO_MAXSIZE 0x4000
 
 #define DYLD_STATE_CHECKED_IN 1

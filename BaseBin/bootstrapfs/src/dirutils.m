@@ -1,3 +1,4 @@
+#include <stdint.h>
 //
 //  dirutils.m
 //  Euphoria bootstrapfs — measurement, preflight and hardened copy

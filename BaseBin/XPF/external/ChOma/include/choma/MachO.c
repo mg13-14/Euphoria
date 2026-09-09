@@ -6,6 +6,7 @@
 #include "MemoryStream.h"
 
 #include <mach-o/loader.h>
+#include <stdint.h>
 #include <mach-o/nlist.h>
 #include <mach/machine.h>
 #include <stdlib.h>

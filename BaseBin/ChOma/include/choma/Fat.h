@@ -2,6 +2,7 @@
 #define MACHO_H
 
 #include <stdio.h>
+#include <stdint.h>
 #include <libkern/OSByteOrder.h>
 #include <mach/mach.h>
 #include <mach-o/loader.h>

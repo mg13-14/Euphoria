@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "kcall_arm64.h"
 
 #include "primitives.h"

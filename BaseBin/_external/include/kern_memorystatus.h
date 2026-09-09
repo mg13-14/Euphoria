@@ -30,6 +30,7 @@
 #define SYS_MEMORYSTATUS_H
 
 #include <sys/time.h>
+#include <stdint.h>
 #include <mach_debug/zone_info.h>
 #include <sys/proc.h>
 

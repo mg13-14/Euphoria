@@ -2,6 +2,7 @@
 #define MACHO_BYTE_ORDER_H
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <libkern/OSByteOrder.h>
 

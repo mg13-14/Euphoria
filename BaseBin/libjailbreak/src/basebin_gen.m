@@ -1,3 +1,4 @@
+#include <stdint.h>
 #import "libjailbreak.h"
 #import "carboncopy.h"
 #import "codesign.h"

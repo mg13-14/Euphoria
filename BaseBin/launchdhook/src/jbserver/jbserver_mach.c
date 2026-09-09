@@ -1,4 +1,5 @@
 #include <libjailbreak/jbserver.h>
+#include <stdint.h>
 #include <mach/mach.h>
 #include <bsm/audit.h>
 #include <libproc.h>

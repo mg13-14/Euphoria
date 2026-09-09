@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "kcall_Fugu14.h"
 
 #include "primitives.h"

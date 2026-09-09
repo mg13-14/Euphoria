@@ -1,4 +1,5 @@
 #include <sys/sysctl.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <kern_memorystatus.h>

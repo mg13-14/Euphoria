@@ -1,5 +1,6 @@
 #include "kernel.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include "primitives.h"
 #include "info.h"
 #include "util.h"

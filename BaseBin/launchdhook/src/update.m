@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 #include <libjailbreak/util.h>
 #include <libjailbreak/trustcache.h>
 #include <libjailbreak/kcall_arm64.h>

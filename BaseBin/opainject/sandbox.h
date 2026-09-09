@@ -1,3 +1,4 @@
+#include <stdint.h>
 enum sandbox_filter_type {
 	SANDBOX_FILTER_NONE,
 	SANDBOX_FILTER_PATH,

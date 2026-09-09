@@ -2,6 +2,7 @@
 #define SYSTEMHOOK_PRIVATE
 
 #include <mach-o/dyld.h>
+#include <stdint.h>
 
 #define SYS_ptrace 0x1A
 #define SYS_execve 0x3B

@@ -2,6 +2,7 @@
 #include "PatchFinder.h"
 #include "arm64.h"
 #include <sys/mman.h>
+#include <stdint.h>
 
 // Unified check for whether anything writes to a register between firstAddr and secondAddr
 bool pfsec_arm64_scan_register_write(PFSection *section, arm64_register reg, uint64_t endAddr, uint64_t startAddr)

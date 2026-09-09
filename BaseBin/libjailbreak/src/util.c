@@ -4,6 +4,7 @@
 #include "kernel.h"
 #include "translation.h"
 #include <spawn.h>
+#include <stdint.h>
 #include <mach/mach_time.h>
 #include <pthread.h>
 #include <signal.h>

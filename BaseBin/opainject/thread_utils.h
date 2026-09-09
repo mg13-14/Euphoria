@@ -1,3 +1,4 @@
+#include <stdint.h>
 #import <mach/arm/thread_status.h>
 #import <mach/thread_status.h>
 #import <mach/mach.h>

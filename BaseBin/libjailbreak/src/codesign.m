@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include <stdint.h>
 #include <Security/Security.h>
 #include <TargetConditionals.h>
 #import "libjailbreak.h"

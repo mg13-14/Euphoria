@@ -1,4 +1,5 @@
 #include <mach-o/dyld.h>
+#include <stdint.h>
 #include <dlfcn.h>
 #include <xpc/xpc.h>
 #include <IOKit/IOKitLib.h>

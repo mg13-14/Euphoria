@@ -2,6 +2,7 @@
 #define SIGNATURES_H
 
 #include <choma/CodeDirectory.h>
+#include <stdint.h>
 #include <choma/Fat.h>
 
 typedef enum {

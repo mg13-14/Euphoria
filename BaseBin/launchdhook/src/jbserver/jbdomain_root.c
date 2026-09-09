@@ -1,5 +1,6 @@
 #include "jbserver_global.h"
 #include <libjailbreak/jbserver_boomerang.h>
+#include <stdint.h>
 #include <libjailbreak/trustcache.h>
 #include <libjailbreak/info.h>
 #include <libjailbreak/kernel.h>

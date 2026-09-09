@@ -1,5 +1,6 @@
 #include "common.h"
 #include <xpc/xpc.h>
+#include <stdint.h>
 #include <xpc_private.h>
 #include <mach-o/dyld.h>
 #include <sys/param.h>

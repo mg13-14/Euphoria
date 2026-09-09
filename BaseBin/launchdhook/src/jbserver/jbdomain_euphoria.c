@@ -2,6 +2,7 @@
 #include "jbsettings.h"
 
 #include <libjailbreak/codesign.h>
+#include <stdint.h>
 #include <libjailbreak/libjailbreak.h>
 #include <libproc.h>
 #include <unistd.h>

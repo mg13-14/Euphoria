@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>

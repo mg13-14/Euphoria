@@ -6,6 +6,7 @@
 #include "physrw.h"
 #include "physrw_pte.h"
 #include <bsm/audit.h>
+#include <stdint.h>
 
 // Implements JBS_DOMAIN_ROOT, but only the functionality required for boomerang
 // Exports symbols so that the logic can be reused by launchdhook

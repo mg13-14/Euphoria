@@ -2,6 +2,7 @@
 #define __SANDBOX_H__
 
 #include <mach/mach.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 enum sandbox_filter_type {

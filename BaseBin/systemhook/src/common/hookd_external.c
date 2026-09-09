@@ -1,4 +1,5 @@
 #include <sys/syslimits.h>
+#include <stdint.h>
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>
 #include <mach-o/getsect.h>

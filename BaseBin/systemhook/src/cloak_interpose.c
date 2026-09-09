@@ -3,6 +3,7 @@
 #include "common/private.h"
 
 #include <libjailbreak/cloak.h>
+#include <stdint.h>
 #include <libjailbreak/aegis.h>       // R40: aegis_get_policy（黑名单匹配）
 #include <libjailbreak/jbroot.h>
 #include <libjailbreak/util.h>

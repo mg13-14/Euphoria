@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef PRIMITIVES_IOSURFACE_H
 #define PRIMITIVES_IOSURFACE_H
 

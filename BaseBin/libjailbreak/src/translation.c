@@ -4,6 +4,7 @@
 #include "info.h"
 #include <errno.h>
 #include <stdio.h>
+#include <stdint.h>
 
 struct tt_level arm_tt_level[4];
 

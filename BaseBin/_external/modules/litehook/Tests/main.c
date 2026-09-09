@@ -1,6 +1,7 @@
 #include "litehook.h"
 
 #include <sys/socket.h>
+#include <stdint.h>
 #include <mach-o/dyld.h>
 #include <dyld_cache_format.h>
 

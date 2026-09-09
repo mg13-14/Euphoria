@@ -9,6 +9,7 @@
 #include <sys/utsname.h>
 #include <dispatch/dispatch.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <CoreFoundation/CoreFoundation.h>

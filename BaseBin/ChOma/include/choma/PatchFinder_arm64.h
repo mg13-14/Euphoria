@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef PATCHFINDER_ARM64_H
 #define PATCHFINDER_ARM64_H
 

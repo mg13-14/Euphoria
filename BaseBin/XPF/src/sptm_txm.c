@@ -1,6 +1,7 @@
 #import "sptm_txm.h"
 #import "xpf.h"
 #include <choma/arm64.h>
+#include <stdint.h>
 #include <choma/PatchFinder.h>
 
 static uint64_t xpf_find_sptm_args(void)

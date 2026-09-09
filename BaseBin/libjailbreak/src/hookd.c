@@ -2,6 +2,7 @@
 
 #include "libjailbreak.h"
 #include <spawn.h>
+#include <stdint.h>
 #include <xpc_private.h>
 #include "inline_svc.h"
 

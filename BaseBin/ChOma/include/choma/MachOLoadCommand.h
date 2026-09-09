@@ -2,6 +2,7 @@
 #define MACHO_LOAD_COMMAND_H
 
 #include <mach-o/loader.h>
+#include <stdint.h>
 
 #ifndef LC_FILESET_ENTRY
 

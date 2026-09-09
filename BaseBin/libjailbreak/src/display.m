@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "display.h"
 
 #import <Foundation/Foundation.h>

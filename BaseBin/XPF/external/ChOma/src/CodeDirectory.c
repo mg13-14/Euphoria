@@ -4,6 +4,7 @@
 #include "BufferedStream.h"
 #include "MemoryStream.h"
 #include <CommonCrypto/CommonDigest.h>
+#include <stdint.h>
 #include <stddef.h>
 
 void print_cdhash(cdhash_t cdhash)

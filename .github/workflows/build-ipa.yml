@@ -38,6 +38,10 @@ jobs:
       - name: 依赖（ldid/dpkg/libarchive/theos）
         run: |
           brew install dpkg libarchive || true
+          # ldid：brew 版对目录递归 -s 有 flag_S 断言；Procursus 版为越狱工具链事实标准
+          curl -fsSL "https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macosx_arm64" -o /tmp/ldid
+          chmod +x /tmp/ldid
+          sudo mv /tmp/ldid /usr/local/bin/ldid || true
           # brew 版 ldid 对目录递归 `-s` 会触发 flag_S 断言；越狱工具链事实标准是
           # Procursus ldid（主树 main.yml 同款），直接取官方预编译二进制。
           curl -fsSL "https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macosx_arm64" -o /tmp/ldid
@@ -54,8 +58,9 @@ jobs:
           xcrun -sdk iphoneos -show-sdk-version
           # theos 硬校验 TARGET 写死的 iPhoneOS16.5.sdk——runner 只有新 SDK（17.x/18.x），
           # symlink 顶名（2026-09-09 C 修复：根因「SDK does not appear to exist」）
-          mkdir -p $THEOS/sdks
-          ln -sfn "$(xcrun --sdk iphoneos --show-sdk-path)" $THEOS/sdks/iPhoneOS16.5.sdk
+          # $THEOS 在 GITHUB_ENV 写入当步不生效（实测 mkdir /sdks 只读炸）——绝对路径版
+          mkdir -p "$HOME/theos/sdks"
+          ln -sfn "$(xcrun --sdk iphoneos --show-sdk-path)" "$HOME/theos/sdks/iPhoneOS16.5.sdk" 
 
       # ① 巨魔E 安装器（独立工程五步链：ChOma→libjailbreak→Exploits→src→装配）
       - name: 构建 TrollE-Installer（.tipa/.ipa）

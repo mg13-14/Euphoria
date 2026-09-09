@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #ifdef USE_CORECRYPTO
 #include <corecrypto/ccrsa.h>

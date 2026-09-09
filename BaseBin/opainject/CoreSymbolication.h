@@ -52,6 +52,7 @@ extern "C" {
 #endif
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <stdint.h>
 #include <mach/mach.h>
 
 

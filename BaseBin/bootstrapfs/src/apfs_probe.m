@@ -1,3 +1,4 @@
+#include <stdint.h>
 //
 //  apfs_probe.m
 //  Euphoria bootstrapfs — APFS layout probing + volume primitives

@@ -6,6 +6,7 @@
 //
 
 #include <stdio.h>
+#include <stdint.h>
 #include "idownloadd-Bridging-Header.h"
 
 uint64_t c_getkslide(void)

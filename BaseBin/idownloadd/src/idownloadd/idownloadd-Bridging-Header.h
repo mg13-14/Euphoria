@@ -1,3 +1,4 @@
+#include <stdint.h>
 //
 //  idownloadd-Bridging-Header.h
 //  idownloadd

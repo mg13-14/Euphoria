@@ -1,3 +1,4 @@
+#include <stdint.h>
 //
 //  main.m
 //  Euphoria bootstrapfs — transactional mount-over rootful engine CLI

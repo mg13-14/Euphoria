@@ -1,3 +1,4 @@
+#include <stdint.h>
 //
 //  eufs_state.m
 //  Euphoria bootstrapfs — persistent engine state (plist) implementation

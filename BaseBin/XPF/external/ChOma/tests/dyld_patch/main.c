@@ -1,4 +1,5 @@
 #include <choma/CSBlob.h>
+#include <stdint.h>
 #include <choma/Host.h>
 #include <mach-o/nlist.h>
 

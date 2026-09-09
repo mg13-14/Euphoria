@@ -1,4 +1,5 @@
 #include <mach/mach.h>
+#include <stdint.h>
 
 #include <xpc/xpc.h>
 #include <xpc_private.h>

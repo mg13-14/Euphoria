@@ -1,3 +1,4 @@
+#include <stdint.h>
 #import <mach/mach.h>
 #import <stdlib.h>
 

@@ -37,6 +37,7 @@ extern "C" {
 
 #include <libDER/libDER.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 /*
  * Decoding one item consists of extracting its tag, a pointer

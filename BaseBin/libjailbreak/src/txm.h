@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef LJB_TXM_H
 #define LJB_TXM_H
 

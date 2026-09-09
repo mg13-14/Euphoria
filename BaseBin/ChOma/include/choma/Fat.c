@@ -1,5 +1,6 @@
 #include <mach-o/fat.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "Fat.h"
 #include "MachO.h"

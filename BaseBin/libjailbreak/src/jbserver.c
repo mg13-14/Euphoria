@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "jbserver.h"
 #include "util.h"
 

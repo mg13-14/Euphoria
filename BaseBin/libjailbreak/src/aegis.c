@@ -5,6 +5,7 @@
 #include "util.h"
 
 #include <choma/Util.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 

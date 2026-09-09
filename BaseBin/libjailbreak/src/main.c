@@ -1,5 +1,6 @@
 #include "jbclient_xpc.h"
 #include <stdlib.h>
+#include <stdint.h>
 #include "physrw.h"
 #include "physrw_pte.h"
 #include "primitives_IOSurface.h"

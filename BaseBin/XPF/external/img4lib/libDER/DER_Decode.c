@@ -42,6 +42,7 @@
 #define DER_DECODE_DEBUG	0
 #if		DER_DECODE_DEBUG
 #include <stdio.h>
+#include <stdint.h>
 #define derDecDbg(a)			printf(a)
 #define derDecDbg1(a, b)		printf(a, b)
 #define derDecDbg2(a, b, c)		printf(a, b, c)

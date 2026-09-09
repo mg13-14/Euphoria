@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "xpf.h"
 
 static uint64_t xpf_find_arm_vm_init(void)

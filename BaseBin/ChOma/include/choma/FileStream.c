@@ -1,5 +1,6 @@
 #include "FileStream.h"
 #include <sys/fcntl.h>
+#include <stdint.h>
 #include <errno.h>
 #include <os/log.h>
 

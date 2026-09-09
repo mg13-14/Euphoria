@@ -3,6 +3,7 @@
 
 #include "MemoryStream.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 #define BUFFERED_STREAM_FLAG_AUTO_EXPAND (1 << 0)
 

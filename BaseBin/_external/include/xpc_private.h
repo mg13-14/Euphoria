@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef __XPC_PRIVATE_H__
 #define __XPC_PRIVATE_H__
 

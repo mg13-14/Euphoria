@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "Base64.h"
 
 // https://stackoverflow.com/a/6782480

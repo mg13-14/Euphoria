@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef VFS_INTERNAL_H_included
 #define VFS_INTERNAL_H_included
 

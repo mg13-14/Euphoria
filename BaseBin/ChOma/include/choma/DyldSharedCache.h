@@ -6,6 +6,7 @@
 #include "CachePatching.h"
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 typedef struct MachO MachO;
 typedef struct Fat Fat;
 

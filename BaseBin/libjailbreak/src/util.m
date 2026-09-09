@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "info.h"
 #import <Foundation/Foundation.h>
 #import "util.h"

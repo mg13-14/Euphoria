@@ -1,3 +1,4 @@
+#include <stdint.h>
 //
 //  progress.m
 //  Euphoria bootstrapfs — stage-event emitter implementation

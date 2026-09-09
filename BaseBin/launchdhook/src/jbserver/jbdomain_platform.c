@@ -2,6 +2,7 @@
 #include "jbsettings.h"
 
 #include <libjailbreak/codesign.h>
+#include <stdint.h>
 #include <libjailbreak/libjailbreak.h>
 
 extern void systemwide_domain_set_enabled(bool enabled);

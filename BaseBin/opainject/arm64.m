@@ -1,5 +1,6 @@
 #include "arm64.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 uint32_t generate_movk(uint8_t x, uint16_t val, uint16_t lsl)
 {

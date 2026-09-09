@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "choma/PatchFinder.h"
 #include "xpf.h"
 

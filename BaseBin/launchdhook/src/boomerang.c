@@ -1,4 +1,5 @@
 #include <spawn.h>
+#include <stdint.h>
 #include <libjailbreak/libjailbreak.h>
 #include <libjailbreak/jbserver.h>
 #include <libjailbreak/jbserver_boomerang.h>

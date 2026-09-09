@@ -1,6 +1,7 @@
 #include "arm64.h"
 #include "Util.h"
 #include <stdio.h>
+#include <stdint.h>
 
 #define ADRP_PAGE_SIZE 0x1000
 #define ADRP_PAGE_MASK 0x0fff

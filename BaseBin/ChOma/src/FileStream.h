@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef FILE_STREAM_H
 #define FILE_STREAM_H
 

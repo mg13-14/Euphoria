@@ -1,3 +1,4 @@
+#include <stdint.h>
 #import "thread_utils.h"
 
 #import <stdio.h>

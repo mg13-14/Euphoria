@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define MEMORY_STREAM_FLAG_OWNS_DATA (1 << 0)
 #define MEMORY_STREAM_FLAG_MUTABLE (1 << 1)

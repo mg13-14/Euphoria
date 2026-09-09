@@ -4,6 +4,7 @@
 #include "Util.h"
 #include "PatchFinder_arm64.h"
 #include <mach/machine.h>
+#include <stdint.h>
 
 void pfsec_info_populate_section(PFSectionInfo *sectionInfo, struct section_64 *section, MachOSegment *segment)
 {

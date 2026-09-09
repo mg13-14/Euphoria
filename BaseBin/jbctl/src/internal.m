@@ -1,3 +1,4 @@
+#include <stdint.h>
 #import "internal.h"
 #import <Foundation/Foundation.h>
 #import <libjailbreak/libjailbreak.h>

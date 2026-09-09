@@ -1,4 +1,5 @@
 #include <libjailbreak/info.h>
+#include <stdint.h>
 #include <libjailbreak/primitives_external.h>
 #include <libjailbreak/translation.h>
 #include "corellium.h"

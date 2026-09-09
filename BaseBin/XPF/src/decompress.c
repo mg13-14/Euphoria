@@ -4,6 +4,7 @@
 
 #include "decompress.h"
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <compression.h>
 

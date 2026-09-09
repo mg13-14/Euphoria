@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef PTE_H
 #define PTE_H
 

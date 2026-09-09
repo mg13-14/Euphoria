@@ -1,4 +1,5 @@
 #include <libjailbreak/libjailbreak.h>
+#include <stdint.h>
 #include <mach-o/dyld.h>
 #include <xpc/xpc.h>
 #include <bsm/libbsm.h>

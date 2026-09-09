@@ -1,6 +1,7 @@
 #include "hookd_provider.h"
 
 #include <libjailbreak/libjailbreak.h>
+#include <stdint.h>
 #include <libjailbreak/hookd.h>
 #include <libjailbreak/inline_svc.h>
 #include <spawn.h>

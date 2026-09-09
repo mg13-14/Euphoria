@@ -1,3 +1,4 @@
+#include <stdint.h>
 #import "info.h"
 #import "primitives.h"
 #import "translation.h"

@@ -1,4 +1,5 @@
 #include <mach/mach.h>
+#include <stdint.h>
 
 #define __DeclareSendRpc(...)
 #define __BeforeSendRpc(...)

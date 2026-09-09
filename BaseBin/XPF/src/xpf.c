@@ -1,4 +1,5 @@
 #include <choma/Fat.h>
+#include <stdint.h>
 #include <choma/MachO.h>
 #include <choma/PatchFinder.h>
 #include <choma/MachOByteOrder.h>

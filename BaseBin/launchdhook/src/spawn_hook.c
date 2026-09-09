@@ -1,4 +1,5 @@
 #include <spawn.h>
+#include <stdint.h>
 #include "../systemhook/src/common/common.h"
 #include "boomerang.h"
 #include "crashreporter.h"

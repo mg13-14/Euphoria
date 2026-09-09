@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef ELLEKIT_HOOKD
 #define ELLEKIT_HOOKD
 

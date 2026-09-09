@@ -2,6 +2,7 @@
 #include "MemoryStream.h"
 
 #include <stdlib.h>
+#include <stdint.h>
 
 static int buffered_stream_expand(MemoryStream *stream, size_t expandAtStart, size_t expandAtEnd);
 

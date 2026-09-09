@@ -57,6 +57,7 @@
 #define _LIBKERN_TREE_H_
 
 #include <sys/cdefs.h>
+#include <stdint.h>
 #include "primitives.h"
 #include "info.h"
 

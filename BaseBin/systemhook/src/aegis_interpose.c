@@ -3,6 +3,7 @@
 #include "common/private.h"
 
 #include <libjailbreak/aegis.h>
+#include <stdint.h>
 #include <libjailbreak/jbroot.h>
 #include <libjailbreak/util.h>
 

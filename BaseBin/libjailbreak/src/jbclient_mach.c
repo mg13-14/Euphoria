@@ -1,5 +1,6 @@
 #include "jbclient_mach.h"
 #include <dispatch/dispatch.h>
+#include <stdint.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <pthread.h>

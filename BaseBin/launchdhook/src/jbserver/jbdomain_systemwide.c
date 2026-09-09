@@ -1,6 +1,7 @@
 #include "jbserver_global.h"
 #include "jbsettings.h"
 #include <libjailbreak/info.h>
+#include <stdint.h>
 #include <sandbox.h>
 #include <libproc.h>
 #include <sys/proc_info.h>

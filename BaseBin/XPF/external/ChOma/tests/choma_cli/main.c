@@ -1,4 +1,5 @@
 #include <choma/FileStream.h>
+#include <stdint.h>
 #include <choma/CSBlob.h>
 #include <choma/CodeDirectory.h>
 #include <choma/MachOLoadCommand.h>

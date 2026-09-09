@@ -14,6 +14,7 @@ size_t compression_decode_buffer(uint8_t *restrict dst_buffer, size_t dst_size, 
 #define lzfse_encode_buffer(dst_buffer, dst_size, src_buffer, src_size, scratch_buffer) compression_encode_buffer(dst_buffer, dst_size, src_buffer, src_size, scratch_buffer, COMPRESSION_LZFSE_SMALL)
 #else
 #include <stdio.h>
+#include <stdint.h>
 #include "lzfse.h"
 #endif
 #include "vfs.h"

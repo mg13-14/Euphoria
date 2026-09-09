@@ -1,5 +1,6 @@
 #include "choma/Fat.h"
 #include <choma/CSBlob.h>
+#include <stdint.h>
 #include <choma/Host.h>
 #include <choma/BufferedStream.h>
 #include <choma/PatchFinder.h>

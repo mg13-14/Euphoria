@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "xpf.h"
 
 // Offsets required for the Fugu15 PAC bypass

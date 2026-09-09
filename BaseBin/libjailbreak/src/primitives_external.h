@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef PRIMITIVES_EXTERNAL_H
 #define PRIMITIVES_EXTERNAL_H
 
