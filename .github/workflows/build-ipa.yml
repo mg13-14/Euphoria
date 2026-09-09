@@ -52,6 +52,10 @@ jobs:
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
           xcodebuild -version
           xcrun -sdk iphoneos -show-sdk-version
+          # theos 硬校验 TARGET 写死的 iPhoneOS16.5.sdk——runner 只有新 SDK（17.x/18.x），
+          # symlink 顶名（2026-09-09 C 修复：根因「SDK does not appear to exist」）
+          mkdir -p $THEOS/sdks
+          ln -sfn "$(xcrun --sdk iphoneos --show-sdk-path)" $THEOS/sdks/iPhoneOS16.5.sdk
 
       # ① 巨魔E 安装器（独立工程五步链：ChOma→libjailbreak→Exploits→src→装配）
       - name: 构建 TrollE-Installer（.tipa/.ipa）
@@ -85,6 +89,15 @@ jobs:
             TrollE-Installer/build/*.tipa
             TrollE-Installer/build/*.ipa
             Application/Euphoria.tipa
+          if-no-files-found: error
+
+      # 主 App 独立产物+硬缺失红——防 make trolle-payload 软失败吞错（2026-09-09 C：
+      # 曾出现八步全绿但产物无 Euphoria.tipa 的假绿，本段让主 App 缺失直接红）
+      - name: 上传主 App（硬校验）
+        uses: actions/upload-artifact@v4
+        with:
+          name: Euphoria-app-tipa
+          path: Application/Euphoria.tipa
           if-no-files-found: error
 
       - name: 挂 Release（仅 tag 触发）
