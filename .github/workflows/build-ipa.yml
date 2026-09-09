@@ -35,7 +35,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 依赖（ldid/dpkg/libarchive）
+      - name: 依赖（ldid/dpkg/libarchive/theos）
         run: |
           brew install dpkg libarchive || true
           # brew 版 ldid 对目录递归 `-s` 会触发 flag_S 断言；越狱工具链事实标准是
@@ -44,6 +44,12 @@ jobs:
           chmod +x /tmp/ldid
           sudo mv /tmp/ldid /usr/local/bin/ldid
           ldid -V || true
+          # theos：BaseBin 的 opainject/rootlesshooks 子项目 Makefile 依赖
+          # （include $(THEOS)/makefiles/common.mk）——runner 不预装，必须克隆。
+          # TARGET 若写死 iphone:clang:16.5 而本机 SDK 更新：theos 仅警告并取
+          # 最高可用版本，属可跑警告（并行搜索员C 19:30 指示的修法）。
+          git clone --recursive https://github.com/theos/theos.git ~/theos
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
           xcodebuild -version
           xcrun -sdk iphoneos -show-sdk-version
 
