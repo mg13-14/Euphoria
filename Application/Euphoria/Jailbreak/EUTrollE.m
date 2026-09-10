@@ -11,6 +11,8 @@
 #import "EUBootstrapper.h"
 #import "EUExploitManager.h"
 #import <libjailbreak/util.h>
+#include <spawn.h>
+#include <sys/wait.h>
 #import <libjailbreak/kernel.h>      // proc_ucred（B25-1 ② 17+ 直接内核写入）
 #import <libjailbreak/primitives.h>  // kread32/kwrite32/kread_ptr
 #import <libjailbreak/trustcache.h>
@@ -731,9 +733,12 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
             if (url) {
                 // UIApplication 在 basebin 工具进程不可用（守护环境无 App 生命周期）——
                 // 移交安装改走 open 命令（越狱态工具链标准做法；euphoria 链接不含 UIKit）
-                NSString *openCmd = [NSString stringWithFormat:@"open \"%@\"", url.absoluteString];
-                int openRc = system(openCmd.UTF8String);
-                EUTrolleLog(@"巨魔E：本体在位，已移交安装 → %@（open rc=%d）", appURL.lastPathComponent, openRc);
+                // system() iOS 不可用（r23）——posix_spawn 调 /usr/bin/open（basebin 装后自备）
+                const char *openArgs[] = {"/usr/bin/open", url.absoluteString.UTF8String, NULL};
+                pid_t openPid = 0;
+                int openRc = posix_spawn(&openPid, openArgs[0], NULL, NULL,
+                                         (char *const *)openArgs, NULL);
+                EUTrolleLog(@"巨魔E：本体在位，已移交安装 → %@（spawn rc=%d）", appURL.lastPathComponent, openRc);
                 if (error) *error = nil;
                 return YES;
             }
