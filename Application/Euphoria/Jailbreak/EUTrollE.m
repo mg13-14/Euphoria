@@ -729,8 +729,11 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
                                   [NSCharacterSet URLQueryAllowedCharacterSet]]];
             NSURL *url = [NSURL URLWithString:handoff];
             if (url) {
-                [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
-                EUTrolleLog(@"巨魔E：本体在位，已移交安装 → %@", appURL.lastPathComponent);
+                // UIApplication 在 basebin 工具进程不可用（守护环境无 App 生命周期）——
+                // 移交安装改走 open 命令（越狱态工具链标准做法；euphoria 链接不含 UIKit）
+                NSString *openCmd = [NSString stringWithFormat:@"open \"%@\"", url.absoluteString];
+                int openRc = system(openCmd.UTF8String);
+                EUTrolleLog(@"巨魔E：本体在位，已移交安装 → %@（open rc=%d）", appURL.lastPathComponent, openRc);
                 if (error) *error = nil;
                 return YES;
             }
