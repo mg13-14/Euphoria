@@ -169,7 +169,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
     NSString *appBundlePath = nil;
 
     // ① 解包（.ipa → 暂存目录；.app 直接用）
-    if ([appURL.pathExtension.caseInsensitiveCompare:@"ipa"] == NSOrderedSame) {
+    if ([appURL.pathExtension caseInsensitiveCompare:@"ipa"] == NSOrderedSame) {
         NSString *unzipPath = JBROOT_PATH(@"/usr/bin/unzip");
         if (![[NSFileManager defaultManager] isExecutableFileAtPath:unzipPath]) {
             if (error) *error = fail(EUTrollEErrorCodeUnzipMissing, @"缺少 unzip（请先在包管理器中安装 unzip 包，Procursus 源提供）");
@@ -199,7 +199,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
             }
         }
     }
-    else if ([appURL.pathExtension.caseInsensitiveCompare:@"app"] == NSOrderedSame) {
+    else if ([appURL.pathExtension caseInsensitiveCompare:@"app"] == NSOrderedSame) {
         appBundlePath = appURL.path;
     }
 
@@ -238,7 +238,9 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
 
     // ④ 拷入 /var/jb/Applications（root）
     __block BOOL copied = NO;
-    NSString *destPath = JBROOT_PATH([NSString stringWithFormat:@"/Applications/%@", appBundlePath.lastPathComponent]);
+    // JBROOT_PATH 宏对含逗号实参在 Xcode26 预处理下展开异常（r21 L241:86/L241:26 双错）
+    // ——语义等价直写：jbroot=/var/jb，/Applications 拼接与宏版完全一致
+    NSString *destPath = [NSString stringWithFormat:@"/var/jb/Applications/%@", appBundlePath.lastPathComponent];
     [[EUEnvironmentManager sharedManager] runAsRoot:^{
         [[NSFileManager defaultManager] removeItemAtPath:destPath error:nil];
         copied = [[NSFileManager defaultManager] copyItemAtPath:appBundlePath toPath:destPath error:nil];
@@ -263,7 +265,7 @@ static BOOL EUTrollEComputeCDHash(NSString *binaryPath, uint8_t cdhash[CS_CDHASH
         @"bundleID" : bundleID,
         @"path" : destPath,
         @"cdhash" : cdhashHex,
-        @"installedAt" : [[NSDate date] timeIntervalSince1970],
+        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
     }];
     [self saveEntries:entries];
 
@@ -845,7 +847,7 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
         @"cdhash" : cdhashHex,
         @"role" : @"body",           // 引擎B 装出的首个应用=巨魔E 本体
         @"engine" : @"B",            // 来源标记（A/B 互不冲突）
-        @"installedAt" : [[NSDate date] timeIntervalSince1970],
+        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
     }];
     // 保存此时进程为 root，直接落盘（无 runAsRoot 依赖——那是越狱态通道）
     NSString *registryDir = [[EUTrollE registryPath] stringByDeletingLastPathComponent];
@@ -933,7 +935,7 @@ static BOOL EUTrollEJailedRootify(uint64_t selfProc)
         @"role" : @"guest",           // 容器内访客应用
         @"engine" : @"C",
         @"container" : uuid,          // 启动引用：euphoria-trolle://launch?id=<uuid>
-        @"installedAt" : [[NSDate date] timeIntervalSince1970],
+        @"installedAt" : @([[NSDate date] timeIntervalSince1970]),
     }];
     [self saveEntries:entries];
 
