@@ -65,7 +65,7 @@ jobs:
           # 上游 CRKatri/trustcache，runner 不预装；r26 实测 No such file or directory）
           git clone -q https://github.com/CRKatri/trustcache.git /tmp/trustcache
           make -C /tmp/trustcache OPENSSL=1 \
-            CFLAGS="-I/opt/homebrew/opt/openssl@3/include" \
+            CFLAGS="-DOPENSSL -I/opt/homebrew/opt/openssl@3/include" \
             LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"
           sudo cp /tmp/trustcache/trustcache /usr/local/bin/trustcache
           which trustcache
