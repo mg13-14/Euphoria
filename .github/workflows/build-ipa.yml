@@ -60,7 +60,15 @@ jobs:
           # symlink 顶名（2026-09-09 C 修复：根因「SDK does not appear to exist」）
           # $THEOS 在 GITHUB_ENV 写入当步不生效（实测 mkdir /sdks 只读炸）——绝对路径版
           mkdir -p "$HOME/theos/sdks"
-          ln -sfn "$(xcrun --sdk iphoneos --show-sdk-path)" "$HOME/theos/sdks/iPhoneOS16.5.sdk" 
+          ln -sfn "$(xcrun --sdk iphoneos --show-sdk-path)" "$HOME/theos/sdks/iPhoneOS16.5.sdk"
+          # trustcache 工具（主树装配 `trustcache create .build/basebin.tc` 需要——
+          # 上游 CRKatri/trustcache，runner 不预装；r26 实测 No such file or directory）
+          git clone -q https://github.com/CRKatri/trustcache.git /tmp/trustcache
+          make -C /tmp/trustcache OPENSSL=1 \
+            CFLAGS="-I/opt/homebrew/opt/openssl@3/include" \
+            LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"
+          sudo cp /tmp/trustcache/trustcache /usr/local/bin/trustcache
+          which trustcache
 
       # ① 巨魔E 安装器（独立工程五步链：ChOma→libjailbreak→Exploits→src→装配）
       - name: 构建 TrollE-Installer（.tipa/.ipa）
