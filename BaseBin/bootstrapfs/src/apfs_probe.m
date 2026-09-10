@@ -77,7 +77,7 @@ static NSString *eufs_fullname_for_bsd(NSString *bsdName)
         if (!bsdName.length) return nil;
         CFMutableDictionaryRef matching = IOServiceMatching("AppleAPFSVolume");
         io_iterator_t iter = 0;
-        if (IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iter) != KERN_SUCCESS) return nil;
+        if (IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter) != KERN_SUCCESS) return nil;
         NSString *result = nil;
         io_object_t service;
         while ((service = IOIteratorNext(iter)) != 0) {
@@ -102,7 +102,7 @@ static NSArray<NSString *> *eufs_all_volume_bsds(void)
         CFMutableDictionaryRef matching = IOServiceMatching("AppleAPFSVolume");
         io_iterator_t iter = 0;
         NSMutableArray *out = [NSMutableArray array];
-        if (IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iter) != KERN_SUCCESS) return out;
+        if (IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter) != KERN_SUCCESS) return out;
         io_object_t service;
         while ((service = IOIteratorNext(iter)) != 0) {
                 NSString *dev = eufs_bsd_name_of(service);
@@ -141,7 +141,7 @@ static NSString *eufs_parent_of_volume(NSString *bsdName)
         if (!bsdName.length) return nil;
         CFMutableDictionaryRef matching = IOServiceMatching("AppleAPFSVolume");
         io_iterator_t iter = 0;
-        if (IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iter) != KERN_SUCCESS) return nil;
+        if (IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter) != KERN_SUCCESS) return nil;
         NSString *result = nil;
         io_object_t service;
         while (!result && (service = IOIteratorNext(iter)) != 0) {

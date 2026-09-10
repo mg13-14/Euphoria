@@ -80,8 +80,8 @@ int eufs_state_load(eufs_state *s)
                         ? [r[@"volume"] UTF8String] : "", sizeof(s->roles[i].volumeName));
                 strlcpy(s->roles[i].device, [r[@"device"] isKindOfClass:[NSString class]]
                         ? [r[@"device"] UTF8String] : "", sizeof(s->roles[i].device));
-		s->roles[i].bytes = [r[@"bytes"] isKindOfClass:[NSNumber class]] ? r[@"bytes"].unsignedLongLongValue : 0;
-		s->roles[i].files = [r[@"files"] isKindOfClass:[NSNumber class]] ? r[@"files"].unsignedLongLongValue : 0;
+		s->roles[i].bytes = [r[@"bytes"] isKindOfClass:[NSNumber class]] ? [r[@"bytes"] unsignedLongLongValue] : 0;
+		s->roles[i].files = [r[@"files"] isKindOfClass:[NSNumber class]] ? [r[@"files"] unsignedLongLongValue] : 0;
 		if (s->roles[i].volumeName[0] == '\0' || s->roles[i].device[0] == '\0') return -1;
 	}
 	return 0;
