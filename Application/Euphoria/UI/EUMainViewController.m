@@ -29,7 +29,7 @@
 //   原判定 `minorVersion == 0` 误判域内——补 patchVersion 判定；16.7 分界与主树
 //   EUTrollE.m 统一为精确 20H18（原 <= 字典序偏宽）。
 //   落码：并行搜索员C，2026-09-05（主 App 入口半场）。
-static BOOL EUTrollECTPermanentDomain(void)
+BOOL EUTrollECTPermanentDomain(void) // v1.0.5 链接修复：去 static——EUTrollEMainViewController.m:34 extern 引用需要外部链接
 {
     NSOperatingSystemVersion v = [NSProcessInfo processInfo].operatingSystemVersion;
     if (v.majorVersion == 17) return (v.minorVersion == 0 && v.patchVersion == 0);
