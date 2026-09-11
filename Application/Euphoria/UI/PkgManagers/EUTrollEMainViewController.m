@@ -28,6 +28,7 @@
 #import "EUEnvironmentManager.h"
 #import "EUUIManager.h"
 #import "EUGlobalAppearance.h"
+#import <libjailbreak/util.h>   // exec_cmd_trusted（uicache 通道）
 #import <MobileCoreServices/MobileCoreServices.h> // kUTTypeData（dylib 导入 picker）
 
 extern BOOL EUTrollECTPermanentDomain(void); // EUMainViewController.m（C24 矩阵 UI 面，⑬修复版）
@@ -51,7 +52,9 @@ extern BOOL EUTrollECTPermanentDomain(void); // EUMainViewController.m（C24 矩
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-    self.view.backgroundColor = [EUFairyStyle backgroundGradientInView:self.view] ?: [UIColor colorWithRed:0.07 green:0.09 blue:0.16 alpha:1.0];
+    CAGradientLayer *bgLayer = [EUFairyStyle deepSpaceBackgroundInView:self.view];
+    if (bgLayer) [self.view.layer insertSublayer:bgLayer atIndex:0];
+    self.view.backgroundColor = [UIColor colorWithRed:0.07 green:0.09 blue:0.16 alpha:1.0];
     self.dylibPool = [NSMutableArray array];
     [self buildTableView];
     [self buildDock];
@@ -401,7 +404,7 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
             [[EUUIManager sharedInstance] sendLog:@"巨魔E · uicache 刷新图标缓存" debug:NO];
             // uicache 经 EUEnvironmentManager 的 spawn 通道（引擎侧已有）
             [[EUEnvironmentManager sharedManager] runAsRoot:^{
-                system("/var/jb/usr/bin/uicache -p /var/jb/Applications 2>/dev/null");
+                exec_cmd_trusted("/var/jb/usr/bin/uicache", "-p", "/var/jb/Applications", NULL); // system() iOS 不可用（EUTrollE.m 同款修法）
             }];
         }
     }
