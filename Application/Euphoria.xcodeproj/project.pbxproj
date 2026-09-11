@@ -39,6 +39,7 @@
                 04C2469D2B73220400E17924 /* EUUpdateCircleView.m in Sources */ = {isa = PBXBuildFile; fileRef = 04C246992B73220400E17924 /* EUUpdateCircleView.m */; };
                 04C246A12B73225800E17924 /* EUDownloadViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 04C246A02B73225800E17924 /* EUDownloadViewController.m */; };
                 04C246AE2B74ACA200E17924 /* EUAppSwitch.m in Sources */ = {isa = PBXBuildFile; fileRef = 04C246AD2B74ACA200E17924 /* EUAppSwitch.m */; };
+				AA1F2B3C4D5E6F708192A3B6 /* EUFairyStyle.m in Sources */ = {isa = PBXBuildFile; fileRef = AA1F2B3C4D5E6F708192A3B5 /* EUFairyStyle.m */; };
                 04C246B12B74B05800E17924 /* EUPkgManagerPickerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 04C246B02B74B05800E17924 /* EUPkgManagerPickerView.m */; };
                 04C246B32B74B65900E17924 /* PkgManagers.plist in Resources */ = {isa = PBXBuildFile; fileRef = 04C246B22B74B65900E17924 /* PkgManagers.plist */; };
                 E14C00022B74B65900E17924 /* PresetSources.plist in Resources */ = {isa = PBXBuildFile; fileRef = E14C00012B74B65900E17924 /* PresetSources.plist */; };
@@ -477,6 +478,8 @@
                 04C246A02B73225800E17924 /* EUDownloadViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = EUDownloadViewController.m; sourceTree = "<group>"; };
                 04C246AC2B74ACA200E17924 /* EUAppSwitch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EUAppSwitch.h; sourceTree = "<group>"; };
                 04C246AD2B74ACA200E17924 /* EUAppSwitch.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = EUAppSwitch.m; sourceTree = "<group>"; };
+				AA1F2B3C4D5E6F708192A3B4 /* EUFairyStyle.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EUFairyStyle.h; sourceTree = "<group>"; };
+				AA1F2B3C4D5E6F708192A3B5 /* EUFairyStyle.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = EUFairyStyle.m; sourceTree = "<group>"; };
                 04C246AF2B74B05800E17924 /* EUPkgManagerPickerView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EUPkgManagerPickerView.h; sourceTree = "<group>"; };
                 04C246B02B74B05800E17924 /* EUPkgManagerPickerView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = EUPkgManagerPickerView.m; sourceTree = "<group>"; };
                 04C246B22B74B65900E17924 /* PkgManagers.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PkgManagers.plist; sourceTree = "<group>"; };
@@ -1014,6 +1017,8 @@
                                 040622A92B77FE8E00393AAD /* EUPkgManagerPickerViewController.m */,
                                 86B9BC18AEE62850BE61A429 /* EUTrollEMainViewController.h */,
                                 1A5C51C4781E03ABCA1A7654 /* EUTrollEMainViewController.m */,
+						AA1F2B3C4D5E6F708192A3B4 /* EUFairyStyle.h */,
+						AA1F2B3C4D5E6F708192A3B5 /* EUFairyStyle.m */,
                                 04C246B22B74B65900E17924 /* PkgManagers.plist */,
                         );
                         path = PkgManagers;
@@ -2301,6 +2306,7 @@
                                 042479B32B66916B0082581B /* EUDebugLogView.m in Sources */,
                                 042479AF2B66916B0082581B /* EUNavigationController.m in Sources */,
                                 04C246AE2B74ACA200E17924 /* EUAppSwitch.m in Sources */,
+						AA1F2B3C4D5E6F708192A3B6 /* EUFairyStyle.m in Sources */,
                                 8C6599DB2C555A60000FF57F /* EUPSJetsamListItemsController.m in Sources */,
                                 042479B22B66916B0082581B /* EULyricsLogView.m in Sources */,
                                 042479A52B66916B0082581B /* EUCreditsCell.m in Sources */,
@@ -3023,7 +3029,7 @@
                                 GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
                                 GCC_WARN_UNUSED_FUNCTION = YES;
                                 GCC_WARN_UNUSED_VARIABLE = YES;
-                                HEADER_SEARCH_PATHS = "$(SRCROOT)/../BaseBin/.include";
+                                HEADER_SEARCH_PATHS = "$(SRCROOT)/../BaseBin/.include $(SRCROOT) $(SRCROOT)/UI $(SRCROOT)/UI/PkgManagers $(SRCROOT)/Jailbreak $(SRCROOT)/Extensions $(SRCROOT)/Dependencies $(SRCROOT)/Headers";
                                 IPHONEOS_DEPLOYMENT_TARGET = 15.0;
                                 LIBRARY_SEARCH_PATHS = (
                                         "$(SRCROOT)/../BaseBin/.build",
@@ -3085,7 +3091,7 @@
                                 GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
                                 GCC_WARN_UNUSED_FUNCTION = YES;
                                 GCC_WARN_UNUSED_VARIABLE = YES;
-                                HEADER_SEARCH_PATHS = "$(SRCROOT)/../BaseBin/.include";
+                                HEADER_SEARCH_PATHS = "$(SRCROOT)/../BaseBin/.include $(SRCROOT) $(SRCROOT)/UI $(SRCROOT)/UI/PkgManagers $(SRCROOT)/Jailbreak $(SRCROOT)/Extensions $(SRCROOT)/Dependencies $(SRCROOT)/Headers";
                                 IPHONEOS_DEPLOYMENT_TARGET = 15.0;
                                 LIBRARY_SEARCH_PATHS = (
                                         "$(SRCROOT)/../BaseBin/.build",
