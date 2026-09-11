@@ -55,6 +55,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)runUnsandboxed:(void (^)(void))unsandboxBlock;
 - (void)runAsRoot:(void (^)(void))rootBlock;
+- (int)spawnJbctlAsRootWithArgs:(NSArray *)args;   // .m:421 已实现——补声明（v1.0.4 EUSettingsController 三处调用 no visible @interface 根因）
 
 - (void)respring;
 - (void)rebootUserspace;
