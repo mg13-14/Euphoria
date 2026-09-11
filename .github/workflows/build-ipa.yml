@@ -90,6 +90,11 @@ jobs:
       - name: 构建 Euphoria 本体（.tipa）+ 投放安装器 payload
         id: build-main
         run: |
+          # App 内嵌 bootstrap 资源（.gitignore 设计不入库——CI 现场下载官方源，
+          # v1.0.3 Error 65 根因：Copy Bundle Resources 引用存在但文件缺失）
+          cd Application/Euphoria/Resources
+          bash download_bootstraps.sh
+          cd ../../..
           make trolle-payload || echo "::warning::主树构建失败（见日志）——安装器仍已产出"
           ls -la Application/*.tipa 2>/dev/null || true
           ls -la TrollE-Installer/payload/ 2>/dev/null || true
