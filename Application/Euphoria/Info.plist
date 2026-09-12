@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
         <key>CFBundleDisplayName</key>
-        <string>巨魔E</string>
+        <string>Euphoria</string>
         <key>CFBundleShortVersionString</key>
-        <string>0.9.2</string>
+        <string>1.0.7</string>
         <key>UIApplicationSceneManifest</key>
         <dict>
                 <key>UIApplicationSupportsMultipleScenes</key>
