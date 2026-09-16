@@ -3,25 +3,45 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Euphoria v1.0.6 安装</title>
+<title>Euphoria v1.0.7 Safari 直装</title>
 <style>
-body{font-family:-apple-system,sans-serif;background:#111;color:#eee;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
-.card{background:#1c1c1e;border-radius:16px;padding:32px;max-width:340px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)}
-.icon{width:80px;height:80px;border-radius:20px;background:linear-gradient(135deg,#5e72e4,#8e44ad);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:36px;color:#fff;font-weight:700}
-h1{font-size:20px;margin:8px 0 4px}
-p{font-size:13px;color:#aaa;margin:4px 0}
-button{margin-top:20px;width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#5e72e4,#8e44ad);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
-.warn{margin-top:16px;font-size:11px;color:#777;line-height:1.5}
+body{font-family:-apple-system,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:24px 14px;display:flex;justify-content:center;min-height:100vh}
+.box{max-width:400px;width:100%;background:#161b22;border:1px solid #30363d;border-radius:16px;padding:26px 18px;align-self:center}
+h1{font-size:20px;margin:0 0 4px;text-align:center}
+.sub{color:#8b949e;font-size:12px;margin-bottom:18px;text-align:center}
+.step{background:#21262d;border-radius:12px;padding:14px;margin:12px 0}
+.step b{display:block;margin-bottom:5px;font-size:15px}
+.step p{margin:4px 0;font-size:12px;color:#8b949e;line-height:1.5}
+.btn{display:block;margin:10px 0 4px;padding:13px;border-radius:12px;text-decoration:none;font-weight:600;font-size:15px;text-align:center}
+.btn1{background:#d29922;color:#000}
+.btn2{background:#238636;color:#fff}
+.warn{font-size:11px;color:#f85149;margin-top:14px;line-height:1.6}
+.ok{color:#3fb950}
 </style>
 </head>
 <body>
-<div class="card">
-<div class="icon">E</div>
-<h1>Euphoria 越狱软件</h1>
-<p>v1.0.6（正名版）· rootless</p>
-<p id="status">iOS 15.0 – 18.x · arm64</p>
-<button onclick="location.href='itms-services://?action=download-manifest&url=https://mg13-14.github.io/Euphoria/manifest.xml'">点击安装</button>
-<div class="warn">企业签掉签后 App 将无法启动，需重新获取新证书签名后的链接。安装失败=证书已被苹果吊销。</div>
+<div class="box">
+<h1>Euphoria v1.0.7 直装</h1>
+<div class="sub">企业证书签名 · Safari 在线安装 · 无需电脑 · 免费证书方案</div>
+
+<div class="step">
+<b>第 1 步 · 安装防掉签描述文件 <span class="ok">（必装）</span></b>
+<p>先在 Safari 点下方按钮下载，然后去 设置 → 通用 → VPN与设备管理 → 已下载的描述文件 → 右上角安装。仅屏蔽苹果「证书吊销在线验证」域名，不影响正常上网。</p>
+<a class="btn btn1" href="./anti-revoke.mobileconfig">① 下载描述文件</a>
+</div>
+
+<div class="step">
+<b>第 2 步 · 安装 Euphoria 本体</b>
+<p>回到本页点按钮，弹窗确认后回桌面等图标出现（1-2 分钟）。</p>
+<a class="btn btn2" href="itms-services://?action=download-manifest&url=https://mg13-14.github.io/Euphoria/manifest.xml">② 立即安装 Euphoria</a>
+</div>
+
+<div class="step">
+<b>第 3 步 · 信任企业证书</b>
+<p>设置 → 通用 → VPN与设备管理 → China Telecom Corporation Limited → 信任。iOS 18+ 装完重启一次。</p>
+</div>
+
+<div class="warn">排障：装不上=先确认第 1 步描述文件已安装生效；图标灰着等一会；打不开=第 3 步没信任。本方案基于免费共享企业证书（苹果吊销后靠描述文件屏蔽验证），属社区标准免费玩法，掉签不影响已装 App 启动。移除描述文件：设置→通用→VPN与设备管理→移除已下载的描述文件。</div>
 </div>
 </body>
 </html>
