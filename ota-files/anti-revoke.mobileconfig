@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>DNSSettings</key>
+			<dict>
+				<key>DNSProtocol</key>
+				<string>HTTPS</string>
+				<key>ServerURL</key>
+				<string>https://0.0.0.0/dns-query</string>
+				<key>SupplementalMatchDomains</key>
+				<array>
+					<string>ocsp.apple.com</string>
+					<string>ocsp2.apple.com</string>
+					<string>valid.apple.com</string>
+					<string>crl.apple.com</string>
+					<string>certs.apple.com</string>
+					<string>appattest.apple.com</string>
+					<string>vpp.itunes.apple.com</string>
+				</array>
+			</dict>
+			<key>PayloadDescription</key>
+			<string>Blocks Apple certificate-revocation endpoints so enterprise-signed apps install and run. Only affects listed Apple domains; all other traffic uses normal DNS.</string>
+			<key>PayloadDisplayName</key>
+			<string>Euphoria Anti-Revoke DNS</string>
+			<key>PayloadIdentifier</key>
+			<string>dev.euphoria.antirevoke.7BD9FF6A-AFE6-45AB-9FCF-C316634AA648</string>
+			<key>PayloadOrganization</key>
+			<string>Euphoria Project</string>
+			<key>PayloadType</key>
+			<string>com.apple.dnsSettings.managed</string>
+			<key>PayloadUUID</key>
+			<string>C22C47AF-9C7C-4D16-AA36-F5B6773C3083</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+		</dict>
+	</array>
+	<key>PayloadDescription</key>
+	<string>Prevents iOS from checking enterprise-certificate revocation status. Install this BEFORE installing enterprise-signed Euphoria. Settings - General - VPN &amp; Device Management to remove.</string>
+	<key>PayloadDisplayName</key>
+	<string>Euphoria 防掉签(企业签直装前置)</string>
+	<key>PayloadIdentifier</key>
+	<string>dev.euphoria.antirevoke.profile.DB412522-05FA-4753-855F-568E0E28671A</string>
+	<key>PayloadOrganization</key>
+	<string>Euphoria Project</string>
+	<key>PayloadRemovalDisallowed</key>
+	<false/>
+	<key>PayloadScope</key>
+	<string>System</string>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadUUID</key>
+	<string>19E33CE9-DA44-4EA2-9F9F-56299653B453</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+</dict>
+</plist>

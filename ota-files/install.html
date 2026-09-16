@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Euphoria v1.0.7 Safari 直装</title>
+<style>
+body{font-family:-apple-system,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:24px 16px;text-align:center}
+.box{max-width:420px;margin:0 auto;background:#161b22;border:1px solid #30363d;border-radius:16px;padding:28px 20px}
+h1{font-size:22px;margin:0 0 6px}
+.sub{color:#8b949e;font-size:13px;margin-bottom:22px}
+.step{background:#21262d;border-radius:12px;padding:16px;margin:14px 0;text-align:left}
+.step b{display:block;margin-bottom:6px;font-size:15px}
+.step p{margin:4px 0;font-size:13px;color:#8b949e}
+.btn{display:block;margin:12px 0;padding:14px;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px}
+.btn1{background:#d29922;color:#000}
+.btn2{background:#238636;color:#fff}
+.warn{font-size:12px;color:#f85149;margin-top:16px;text-align:left}
+</style>
+</head>
+<body>
+<div class="box">
+<h1>Euphoria v1.0.7 直装</h1>
+<div class="sub">企业证书签名 · Safari 在线安装 · 无需电脑</div>
+<div class="step">
+<b>第 1 步 · 安装防掉签描述文件</b>
+<p>必须先装这个，否则企业证书会被苹果在线验证拦截。仅屏蔽苹果证书验证域名，不影响其他上网。</p>
+<a class="btn btn1" href="./anti-revoke.mobileconfig">① 安装描述文件</a>
+<p>装完去 设置→通用→VPN与设备管理→已下载描述文件→安装。</p>
+</div>
+<div class="step">
+<b>第 2 步 · Safari 直接安装 Euphoria</b>
+<p>点击下方按钮，弹窗确认后回到桌面等待图标出现（约 1-2 分钟）。</p>
+<a class="btn btn2" href="itms-services://?action=download-manifest&url=https://cdn.jsdelivr.net/gh/mg13-14/Euphoria@ota/manifest.plist">② 安装 Euphoria</a>
+</div>
+<div class="step">
+<b>第 3 步 · 信任企业证书</b>
+<p>设置 → 通用 → VPN与设备管理 → China Telecom Corporation Limited → 信任。iOS 18+ 需重启一次。</p>
+</div>
+<div class="warn">注意：此方案基于共享企业证书（免费），苹果随时可能进一步收紧；如安装失败，先确认第 1 步描述文件已生效，再重试第 2 步。删除描述文件：设置→通用→VPN与设备管理→移除。</div>
+</div>
+</body>
+</html>
