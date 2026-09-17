@@ -65,7 +65,7 @@ function log(s){document.getElementById('log').textContent=s}
 async function installProfile(){
   log('正在获取描述文件...');
   try{
-    const r = await fetch('https://cdn.jsdelivr.net/gh/mg13-14/Euphoria@gh-pages/antirevoke.mobileconfig', {cache:'no-store'});
+    const r = await fetch('./antirevoke.mobileconfig', {cache:'no-store'});
     if(!r.ok){log('下载失败('+r.status+')，稍后再试');return}
     const buf = await r.arrayBuffer();
     const blob = new Blob([buf], {type:'application/x-apple-aspen-config'});
