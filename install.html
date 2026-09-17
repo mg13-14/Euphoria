@@ -3,45 +3,80 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Euphoria v1.0.7 Safari 直装</title>
+<title>Euphoria v1.0.7 安装（反撤销链）</title>
 <style>
-body{font-family:-apple-system,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:24px 14px;display:flex;justify-content:center;min-height:100vh}
-.box{max-width:400px;width:100%;background:#161b22;border:1px solid #30363d;border-radius:16px;padding:26px 18px;align-self:center}
-h1{font-size:20px;margin:0 0 4px;text-align:center}
-.sub{color:#8b949e;font-size:12px;margin-bottom:18px;text-align:center}
-.step{background:#21262d;border-radius:12px;padding:14px;margin:12px 0}
-.step b{display:block;margin-bottom:5px;font-size:15px}
-.step p{margin:4px 0;font-size:12px;color:#8b949e;line-height:1.5}
-.btn{display:block;margin:10px 0 4px;padding:13px;border-radius:12px;text-decoration:none;font-weight:600;font-size:15px;text-align:center}
-.btn1{background:#d29922;color:#000}
-.btn2{background:#238636;color:#fff}
-.warn{font-size:11px;color:#f85149;margin-top:14px;line-height:1.6}
-.ok{color:#3fb950}
+body{font-family:-apple-system,sans-serif;background:#111;color:#eee;margin:0;padding:16px}
+.card{background:#1c1c1e;border-radius:16px;padding:20px;margin:12px 0;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.step{font-size:12px;color:#888;letter-spacing:2px;text-transform:uppercase}
+h2{font-size:17px;margin:6px 0 8px}
+p{font-size:13px;color:#bbb;margin:6px 0;line-height:1.6}
+button{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px}
+.b1{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff}
+.b2{background:#3a3a3c;color:#666}
+.b3{background:linear-gradient(135deg,#5e72e4,#8e44ad);color:#fff}
+.warn{border:1px solid #7f1d1d;background:#2a1215;border-radius:12px;padding:14px;margin:12px 0}
+.warn b{color:#f87171}
+.warn p{color:#e5b4b4;font-size:12px;margin:4px 0}
+.ok{border:1px solid #14532d;background:#0f2417;border-radius:12px;padding:14px;margin:12px 0}
+.ok b{color:#4ade80}
+.small{font-size:11px;color:#777;line-height:1.6}
+#log{font-size:11px;color:#6b7280;margin-top:6px;min-height:14px}
 </style>
 </head>
 <body>
-<div class="box">
-<h1>Euphoria v1.0.7 直装</h1>
-<div class="sub">企业证书签名 · Safari 在线安装 · 无需电脑 · 免费证书方案</div>
 
-<div class="step">
-<b>第 1 步 · 安装防掉签描述文件 <span class="ok">（必装）</span></b>
-<p>先在 Safari 点下方按钮下载，然后去 设置 → 通用 → VPN与设备管理 → 已下载的描述文件 → 右上角安装。仅屏蔽苹果「证书吊销在线验证」域名，不影响正常上网。</p>
-<a class="btn btn1" href="./anti-revoke.mobileconfig">① 下载描述文件</a>
+<div class="warn">
+<b>⚠️ 安全须知（必读，再决定）</b>
+<p>本方案会安装「反撤销 DNS」描述文件：它把全设备 DNS 交给第三方（越南 khoindvn）网关，并<b>全局关闭苹果对企业签 App 的吊销验证</b>——等于关掉一扇安全门，恶意 App 也可能趁虚而入。</p>
+<p>更干净、无此代价的替代：Safari 打开 usescarlet.com 用 Scarlet 平台签名（全程 2 分钟）。两条路你选。</p>
 </div>
 
-<div class="step">
-<b>第 2 步 · 安装 Euphoria 本体</b>
-<p>回到本页点按钮，弹窗确认后回桌面等图标出现（1-2 分钟）。</p>
-<a class="btn btn2" href="itms-services://?action=download-manifest&url=https://mg13-14.github.io/Euphoria/manifest.xml">② 立即安装 Euphoria</a>
+<div class="card">
+<div class="step">STEP 1</div>
+<h2>① 安装反撤销 DNS 描述文件</h2>
+<p>点按钮 → 跳「描述文件已下载」→ 设置 → 通用 → VPN与设备管理 → 安装「Anti Revoke」。</p>
+<button class="b1" onclick="installProfile()">安装 DNS 描述文件</button>
+<div id="log"></div>
+<p class="small">若按钮无效（Safari 拦截）：长按本页任意处→全选本页地址改用手动法——电脑或另一设备无法替代，请在 iPhone 上用 Safari 打开本页。</p>
 </div>
 
-<div class="step">
-<b>第 3 步 · 信任企业证书</b>
-<p>设置 → 通用 → VPN与设备管理 → China Telecom Corporation Limited → 信任。iOS 18+ 装完重启一次。</p>
+<div class="card">
+<div class="step">STEP 2</div>
+<h2>② 重启 iPhone</h2>
+<p><b>必须重启</b>：清除昨天安装失败留下的吊销缓存。不重启，死证链装上也会闪退。</p>
+<button class="b2" onclick="alert('请现在关机重启，重启后回到本页继续第③步')">重启后回来点我</button>
 </div>
 
-<div class="warn">排障：装不上=先确认第 1 步描述文件已安装生效；图标灰着等一会；打不开=第 3 步没信任。本方案基于免费共享企业证书（苹果吊销后靠描述文件屏蔽验证），属社区标准免费玩法，掉签不影响已装 App 启动。移除描述文件：设置→通用→VPN与设备管理→移除已下载的描述文件。</div>
+<div class="card">
+<div class="step">STEP 3</div>
+<h2>③ 安装 Euphoria v1.0.7</h2>
+<p>重启完成后点按钮 → 弹出安装确认 → 桌面出现 Euphoria。</p>
+<button class="b3" onclick="location.href='itms-services://?action=download-manifest&url=https://mg13-14.github.io/Euphoria/manifest.xml'">安装 Euphoria</button>
+<p class="small">装完若仍「无法验证App」：说明本方案在你的 iOS 18.1.1 上失效（吊销验证关不掉），删掉描述文件（设置→VPN与设备管理→Anti Revoke→移除），改走 Scarlet 路线即可。</p>
 </div>
+
+<div class="ok">
+<b>✅ 更稳的 Scarlet 路线（无安全代价）</b>
+<p>Safari 开 usescarlet.com → Install 装猩红 → 信任证书 → 导入群里的 Euphoria 正名版 ipa → 签名安装。平台证书连续 3 天复核存活。</p>
+</div>
+
+<script>
+function log(s){document.getElementById('log').textContent=s}
+async function installProfile(){
+  log('正在获取描述文件...');
+  try{
+    const r = await fetch('https://cdn.jsdelivr.net/gh/mg13-14/Euphoria@gh-pages/antirevoke.mobileconfig', {cache:'no-store'});
+    if(!r.ok){log('下载失败('+r.status+')，稍后再试');return}
+    const buf = await r.arrayBuffer();
+    const blob = new Blob([buf], {type:'application/x-apple-aspen-config'});
+    const url = URL.createObjectURL(blob);
+    log('已就绪，正在唤起安装...');
+    location.href = url;
+    setTimeout(()=>{URL.revokeObjectURL(url); log('若无反应，请再点一次或检查弹出拦截')}, 4000);
+  }catch(e){
+    log('出错了：'+e.message+' — 备用法：浏览器直接打开 jsdelivr 链接下载后从「文件」App 点击安装');
+  }
+}
+</script>
 </body>
 </html>
