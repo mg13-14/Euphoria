@@ -11,15 +11,15 @@
 					<key>kind</key>
 					<string>software-package</string>
 					<key>url</key>
-					<string>https://github.com/mg13-14/Euphoria/releases/download/ota-v1.0.7/Euphoria-v1.0.7-enterprise-signed.ipa</string>
+					<string>IPA_URL_PLACEHOLDER</string>
 				</dict>
 			</array>
 			<key>metadata</key>
 			<dict>
 				<key>bundle-identifier</key>
-				<string>com.ctq.qmc.yiban.product</string>
+				<string>dev.euphoria.Euphoria</string>
 				<key>bundle-version</key>
-				<string>1.0.7</string>
+				<string>1.0.6</string>
 				<key>kind</key>
 				<string>software</string>
 				<key>title</key>
