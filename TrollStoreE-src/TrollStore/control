@@ -1,0 +1,8 @@
+Package: dev.euphoria.trollstoree
+Name: TrollStoreE
+Version: 2.1.1
+Architecture: iphoneos-arm
+Description: An awesome application!
+Maintainer: Euphoria Team
+Author: Euphoria Team (upstream: opa334)
+Section: Utilities

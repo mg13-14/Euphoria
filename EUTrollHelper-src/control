@@ -1,0 +1,8 @@
+Package: dev.euphoria.trollehelper
+Name: EUTrollHelper
+Version: 2.1.1
+Architecture: iphoneos-arm
+Description: Euphoria 巨魔E安装器（TrollHelper 2.1.1 改进·信任态秒装）
+Maintainer: opa334
+Author: opa334
+Section: Applications

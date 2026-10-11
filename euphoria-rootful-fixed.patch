@@ -1,0 +1,3747 @@
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/Application/Euphoria/Jailbreak/EUBootstrapper.m euphoria-v1007-src/Application/Euphoria/Jailbreak/EUBootstrapper.m
+--- euphoria-v1007-pristine/Application/Euphoria/Jailbreak/EUBootstrapper.m	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/Application/Euphoria/Jailbreak/EUBootstrapper.m	2026-10-11 11:49:50.355645323 +0800
+@@ -518,17 +518,17 @@
+ // R14 三模式源清单（用户 08-28 10:17/10:24 裁定）：plist 顶层 dict
+ //   Mode-Rootless = 原版 Dopamine 五源+EU 槽（rootful 复用本清单——用户定案）
+ //   Mode-Roothide = roothide 参照系六源+EU 槽（B20 §1）
+-// 模式判定：本地偏好 rootfulUserEnabled（与设置页开关同键）——
+-//   false（默认）→ roothide 模式；true → rootful（复用 rootless 清单）。
+-// 兼容：顶层为 array（旧结构）时原样返回（roothide 单集），不崩。
+ // 【模式判定 SSOT 化（C 2026-09-05 要求，B 落地）】：三态裁定收敛为
+ //   bootstrapModeKey 单点方法——presetSources（源集选择）与 ElleKit 变体
+ //   选择（R25-2）共用同一判定，杜绝两处判定漂移。
+ - (NSString *)bootstrapModeKey
+ {
+-    BOOL rootful = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"rootfulUserEnabled" fallback:NO];
+-    BOOL roothide = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"roothideUserEnabled" fallback:NO];
+-    return (roothide && !rootful) ? @"Mode-Roothide" : @"Mode-Rootless";
++    // 【固定 rootful 化（2026-10-11 用户定案：固定 rootful、砍无根、保留隐藏）】
++    // 本构建 rootful 唯一：三态判定（rootfulUserEnabled/roothideUserEnabled 偏好
++    // 读取）随 rootless/roothide 模式移除，SSOT 收敛为常量 Mode-Rootless——
++    // rootful 一直复用本清单（用户 08-28 定案"Rootful 则是 rootless 的越狱源"）。
++    // presetSources 与 ElleKit 变体选择（R25-2）继续共用本方法，判定不漂移。
++    return @"Mode-Rootless";
+ }
+ - (NSArray*)presetSources
+ {
+@@ -541,23 +541,18 @@
+             sources = path ? [NSArray arrayWithContentsOfFile:path] ?: @[] : @[];
+             return;
+         }
+-        // 三态裁定（用户 08-28 10:27/08-29 00:11）：roothide/rootful 都没勾=默认 rootless；
+-        // rootful 勾选=捆绑 roothide（开 rootful 自动开 roothide，关 roothide 则强制关 rootful）
+-        // 且源集复用 rootless 清单（用户 10:17"Rootful 则是 rootless 的越狱源"）。
+-        BOOL rootful = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"rootfulUserEnabled" fallback:NO];
+-        BOOL roothide = [[EUPreferenceManager sharedManager] boolPreferenceValueForKey:@"roothideUserEnabled" fallback:NO];
+-        // 源单只分两集：Mode-Roothide（roothide 单开）vs Mode-Rootless（rootless 默认+rootful 复用）
++        // 固定 rootful：bootstrapModeKey 恒 Mode-Rootless（三态偏好判定已随模式移除）。
+         NSString *modeKey = [self bootstrapModeKey];
+         NSArray *list = root[modeKey];
+         if (![list isKindOfClass:[NSArray class]]) {
+             // 防御：无该模式段时回退另一段，再回退空
+-            list = root[(roothide && !rootful) ? @"Mode-Rootless" : @"Mode-Roothide"];
++            list = root[@"Mode-Rothide"];
+             if (![list isKindOfClass:[NSArray class]]) list = @[];
+         }
+         sources = list;
+         [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:
+-            @"PresetSources: %@ 清单 %tu 条（rootful=%d roothide=%d）",
+-            modeKey, sources.count, rootful, roothide] debug:YES];
++            @"PresetSources: %@ 清单 %tu 条（fixed rootful）",
++            modeKey, sources.count] debug:YES];
+     });
+     return sources;
+ }
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/Application/Euphoria/Jailbreak/EUEnvironmentManager.m euphoria-v1007-src/Application/Euphoria/Jailbreak/EUEnvironmentManager.m
+--- euphoria-v1007-pristine/Application/Euphoria/Jailbreak/EUEnvironmentManager.m	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/Application/Euphoria/Jailbreak/EUEnvironmentManager.m	2026-10-11 11:50:01.730001779 +0800
+@@ -360,14 +360,16 @@
+ // 勾 rootful → 自动捆绑 roothide（服务端 jbsettings 写入侧+daemon 双兜底强制），
+ //              rootful 会话同样走 roothide 隐藏栈（用户令：rootful 默认为 roothide）。
+ // 消费方：EUSettingsController（隐藏软件双开关 vs 隐/显越狱单开关的渲染分叉）。
++// 【固定 rootful 化（2026-10-11）】本构建 rootful 唯一，隐藏环境（cloak+
++// aegis 白名单制）随 rootful 恒随行（R4）——isRoothideMode 的三态判定
++// （roothideUserEnabled 读取+R37 联动兜底）随之退役：越狱态恒 YES。
++// 消费方（UI 渲染分叉）语义不变：越狱即隐藏栈在场。
+ - (BOOL)isRoothideMode
+ {
+     if (![self isJailbroken]) return NO;
+-    if (jbclient_jbsettings_get_bool("roothideUserEnabled")) return YES;
+-    // rootful 开着但 roothide 没开=违反联动的存量状态，服务端已兜底关 rootful；
+-    // 这里按"rootful 捆绑 roothide"语义视作 roothide（隐藏栈在 rootful 下也要在）。
+-    if (jbclient_jbsettings_get_bool("rootfulUserEnabled")) return YES;
+-    return NO; // 都没勾=纯 rootless
++    // Fixed-rootful build: the hiding stack rides along with rootful,
++    // unconditionally (R4). The server pins roothideUserEnabled=true too.
++    return YES;
+ }
+ 
+ // R38（用户 2026-08-29 11:41 定案）："检测是 rootful 还是普通 roothide，
+@@ -375,12 +377,14 @@
+ // daemon 在每次越狱时按 rootfulWanted 落形态（stealth 3 vs 1，幂等重放），
+ // 此处读 rootfulUserEnabled 同源判定；cloak 实际 policy（含用户手动覆盖）
+ // 以 jbsettings cloakStealthLevel 为准。
++// 【固定 rootful 化（2026-10-11）】屏蔽形态只剩深档（rootful 态）：daemon
++// 每次越狱把 stealthLevel 幂等重放为 3（euphoria/main.m 固定重放）。三态
++// 读出（rootfulUserEnabled 3 / isRoothideMode 1 / rootless 0）退役。
+ - (NSUInteger)cloakStealthForm
+ {
+     if (![self isJailbroken]) return 0;
+-    if (jbclient_jbsettings_get_bool("rootfulUserEnabled")) return 3; // 深档（rootful 态）
+-    if ([self isRoothideMode]) return 1;                             // 基础档（普通 roothide）
+-    return 0;                                                        // rootless：隐藏栈未随行
++    // Fixed-rootful build: the deep (rootful) form is the only form.
++    return 3;
+ }
+ 
+ - (void)runUnsandboxed:(void (^)(void))unsandboxBlock
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/Application/Euphoria/UI/Settings/EUSettingsController.m euphoria-v1007-src/Application/Euphoria/UI/Settings/EUSettingsController.m
+--- euphoria-v1007-pristine/Application/Euphoria/UI/Settings/EUSettingsController.m	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/Application/Euphoria/UI/Settings/EUSettingsController.m	2026-10-11 12:22:56.245954700 +0800
+@@ -313,52 +313,15 @@
+                     [specifiers addObject:reinstallPackageManagersSpecifier];
+                 }
+ 
+-                // R37（用户 2026-08-29 00:11 定案）：roothide 独立开关。
+-                // 联动：开 rootful 自动开 roothide；关 roothide 强制关 rootful
+-                // （服务端 jbsettings 兜底 + 本地偏好同步）。
+-                {
+-                    PSSpecifier *roothideSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Roothide_Mode") target:self set:@selector(setRoothideEnabled:specifier:) get:@selector(readRoothideEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+-                    [roothideSpecifier setProperty:@YES forKey:@"enabled"];
+-                    [roothideSpecifier setProperty:@"roothideUserEnabled" forKey:@"key"];
+-                    [roothideSpecifier setProperty:@NO forKey:@"default"];
+-                    [roothideSpecifier setProperty:EULocalizedString(@"Roothide_Mode_Footer") forKey:@"footer"];
+-                    [specifiers addObject:roothideSpecifier];
+-                }
++                // 【固定 rootful 化（2026-10-11 用户定案：固定 rootful、砍无根、
++                // 保留隐藏）】roothide/aegis/cloak/rootless-hideJb 四个模式开关全部
++                // 退役：rootful 是本构建的身份而非选项（服务端 jbsettings 对
++                // rootfulUserEnabled/roothideUserEnabled 恒答 true 且拒绝写入）；
++                // 隐藏环境（cloak+aegis 白名单制）随 rootful 恒随行（R4），运维退
++                // 路走 marker 文件（/basebin/.cloak_disabled 等），UI 不再提供第二
++                // 退路（D2 拍板）。矩阵外设备整段由 eutrolle_rootfulSupported 隐藏。
+ 
+-                // R36（用户 10:27:28 定案）：选择 rootless（未勾 rootful/roothide）时
+-                // **不给隐藏软件**（aegis/cloak 仅随 roothide 模式），改给"隐/显越狱"
+-                // 手动入口（Dopamine 同款：jailbreak 应用从主屏图标隐藏，Spotlight 可找回）。
+-                // 两个开关改为仅 roothide 模式渲染：
+-                //   aegis = "隐藏越狱应用"（图标隐藏），cloak = 系统级痕迹隐藏
+-                //   （两者本质都是 roothide 隐藏环境的手动门，rootless 纯净态不该出现）。
+-                BOOL roothideMode = [[EUEnvironmentManager sharedManager] isRoothideMode];
+-                if (roothideMode) {
+-                    PSSpecifier *aegisSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Hide_Jailbreak_Apps") target:self set:@selector(setAegisHidden:specifier:) get:@selector(readAegisHidden:) detail:nil cell:PSSwitchCell edit:nil];
+-                    [aegisSpecifier setProperty:@YES forKey:@"enabled"];
+-                    [aegisSpecifier setProperty:@"aegisEnabled" forKey:@"key"];
+-                    [aegisSpecifier setProperty:@NO forKey:@"default"];
+-                    [aegisSpecifier setProperty:EULocalizedString(@"Hide_Jailbreak_Apps_Footer") forKey:@"footer"];
+-                    [specifiers addObject:aegisSpecifier];
+-
+-                    PSSpecifier *cloakSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Hide_Jailbreak_Traces") target:self set:@selector(setCloakEnabled:specifier:) get:@selector(readCloakEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+-                    [cloakSpecifier setProperty:@YES forKey:@"enabled"];
+-                    [cloakSpecifier setProperty:@"cloakEnabled" forKey:@"key"];
+-                    [cloakSpecifier setProperty:@NO forKey:@"default"];
+-                    [cloakSpecifier setProperty:EULocalizedString(@"Hide_Jailbreak_Traces_Footer") forKey:@"footer"];
+-                    [specifiers addObject:cloakSpecifier];
+-                }
+-                else {
+-                    // rootless：隐/显越狱（Dopamine 同款语义——把越狱 App 本体从
+-                    // 主屏隐藏，Spotlight/设置可找回；与 roothide 的系统级隐藏不同层）。
+-                    // 复用 aegis 同一后端（jbctl aegis add/remove dev.euphoria.Euphoria），
+-                    // 文案键按 Dopamine 惯例叫"Hide Jailbreak"。
+-                    PSSpecifier *hideJbSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Hide_Jailbreak") target:self set:@selector(setAegisHidden:specifier:) get:@selector(readAegisHidden:) detail:nil cell:PSSwitchCell edit:nil];
+-                    [hideJbSpecifier setProperty:@YES forKey:@"enabled"];
+-                    [hideJbSpecifier setProperty:@"jailbreakHidden" forKey:@"key"];
+-                    [hideJbSpecifier setProperty:@NO forKey:@"default"];
+-                    [hideJbSpecifier setProperty:EULocalizedString(@"Hide_Jailbreak_Footer") forKey:@"footer"];
+-                    [specifiers addObject:hideJbSpecifier];
+-                }
++                // （原 aegis/cloak/rootless-hideJb 三开关区已随固定 rootful 化移除）
+ 
+                 // 移除越狱按钮（用户 08-28 00:19："越狱后移除越狱的按钮被吃掉了吗"——恢复越狱态可见）
+                 // 越狱中按下=deleteBootstrap 后 userspace reboot 完成卸载（removeJailbreakPressed 现有逻辑）；
+@@ -376,21 +339,19 @@
+             }
+         }
+ 
+-        // Rootful（T15 前端消费契约 · 用户 08-26 指令被漏实现，08-28 00:19 点名补齐）
+-        // 实测后端=jbctl rootful enable/disable（in-memory remount+overlay）；
+-        // 矩阵（R4）：A12/A13 @ iOS 16.6.1–18.7.1 → 默认开；矩阵外整段隐藏（灰置版留 V0.9.2）。
+-        // purge 按钮后端不存在（jbctl 无 purge 子命令，T15 规格超前）——暂不显示，待后端落地。
++        // Rootful——固定启用（2026-10-11 用户定案：固定 rootful、砍无根）。
++        // 开关退役为静态说明：rootful 是本构建的身份而非选项（服务端 jbsettings
++        // 恒答 true 且拒绝写入）。矩阵（R4：A12/A13 @ iOS 16.6.1-18.7.1）外整段
++        // 隐藏（D1 App 层 UX 预检；daemon 侧硬停才是权威门，见 euphoria/main.m）。
+         if ([self eutrolle_rootfulSupported]) {
+             PSSpecifier *rootfulGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+             rootfulGroupSpecifier.name = EULocalizedString(@"Section_Rootful");
+             [specifiers addObject:rootfulGroupSpecifier];
+ 
+-            PSSpecifier *rootfulSwitchSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Rootful_Mode") target:self set:@selector(setRootfulEnabled:specifier:) get:@selector(readRootfulEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+-            [rootfulSwitchSpecifier setProperty:@YES forKey:@"enabled"];
+-            [rootfulSwitchSpecifier setProperty:@"rootfulUserEnabled" forKey:@"key"];
+-            [rootfulSwitchSpecifier setProperty:@NO forKey:@"default"]; // 默认关（05 §5.1；用户原话"给他一个可以选择的"=用户主动选择。T15/R4 的"矩阵内默认开"与 05 冲突，规划师 v16 评审取保守值）
+-            [rootfulSwitchSpecifier setProperty:EULocalizedString(@"Rootful_Mode_Footer") forKey:@"footer"];
+-            [specifiers addObject:rootfulSwitchSpecifier];
++            PSSpecifier *rootfulFixedSpecifier = [PSSpecifier preferenceSpecifierNamed:EULocalizedString(@"Rootful_Mode") target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
++            [rootfulFixedSpecifier setProperty:EULocalizedString(@"Enabled") forKey:@"title"];
++            [rootfulFixedSpecifier setProperty:EULocalizedString(@"Rootful_Mode_Fixed_Footer") forKey:@"footer"];
++            [specifiers addObject:rootfulFixedSpecifier];
+         }
+ 
+         PSSpecifier *themingGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+@@ -811,69 +772,7 @@
+     return YES;
+ }
+ 
+-- (id)readRootfulEnabled:(PSSpecifier *)specifier
+-{
+-    EUEnvironmentManager *envManager = [EUEnvironmentManager sharedManager];
+-    if (envManager.isJailbroken) {
+-        // BaseBin 真值源（main.m L411 jbclient_jbsettings_get_bool("rootfulUserEnabled")）
+-        bool v = jbclient_jbsettings_get_bool("rootfulUserEnabled");
+-        return @(v);
+-    }
+-    return [self readPreferenceValue:specifier];
+-}
+-
+-- (void)setRootfulEnabled:(id)value specifier:(PSSpecifier *)specifier
+-{
+-    [self setPreferenceValue:value specifier:specifier];
+-    EUEnvironmentManager *envManager = [EUEnvironmentManager sharedManager];
+-    BOOL enable = ((NSNumber *)value).boolValue;
+-    // R37 联动（用户 2026-08-29 00:11）："选了 rootful 会自动给你选 roothide"——
+-    // 本地偏好先落（未越狱态也生效，下次越狱 BaseBin 读取）；
+-    // 越狱态再同步 XPC（服务端 jbsettings 写入侧还有一层捆绑兜底）。
+-    if (enable) {
+-        [[EUPreferenceManager sharedManager] setPreferenceValue:@YES forKey:@"roothideUserEnabled"];
+-        if (envManager.isJailbroken) {
+-            jbclient_platform_jbsettings_set_bool("roothideUserEnabled", YES);
+-        }
+-    }
+-    if (!envManager.isJailbroken) return; // 未越狱：仅记偏好，下次越狱时 BaseBin 读取生效
+-    // ①持久化：写 BaseBin 消费的 jbsettings 键（重越狱后按此分支 rootful/roothide 模式）
+-    jbclient_platform_jbsettings_set_bool("rootfulUserEnabled", enable);
+-    // ②即时生效：jbctl rootful enable/disable（in-memory remount+overlay；实测命令名，T15 文档的
+-    //   "internal rootful" 与实际不符）。purge 子命令后端不存在（T15 超前），按钮不挂出。
+-    int r = [envManager spawnJbctlAsRootWithArgs:@[@"rootful", enable ? @"enable" : @"disable"]];
+-    if (r != 0) {
+-        [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:
+-            @"rootful %@ 失败（jbctl 返回 %d）", enable ? @"enable" : @"disable", r] debug:NO];
+-    }
+-}
+-
+-// R37：roothide 独立开关读写——关 roothide 强制关 rootful（用户 00:11 定案）。
+-- (id)readRoothideEnabled:(PSSpecifier *)specifier
+-{
+-    EUEnvironmentManager *envManager = [EUEnvironmentManager sharedManager];
+-    if (envManager.isJailbroken) {
+-        return @(jbclient_jbsettings_get_bool("roothideUserEnabled"));
+-    }
+-    return [self readPreferenceValue:specifier];
+-}
+ 
+-- (void)setRoothideEnabled:(id)value specifier:(PSSpecifier *)specifier
+-{
+-    [self setPreferenceValue:value specifier:specifier];
+-    BOOL enable = ((NSNumber *)value).boolValue;
+-    if (!enable) {
+-        // "关了 roothide 就不能开 rootful"——本地偏好+XPC 双关
+-        [[EUPreferenceManager sharedManager] setPreferenceValue:@NO forKey:@"rootfulUserEnabled"];
+-    }
+-    EUEnvironmentManager *envManager = [EUEnvironmentManager sharedManager];
+-    if (!envManager.isJailbroken) return;
+-    jbclient_platform_jbsettings_set_bool("roothideUserEnabled", enable);
+-    if (!enable) {
+-        jbclient_platform_jbsettings_set_bool("rootfulUserEnabled", NO);
+-        [[EUUIManager sharedInstance] sendLog:@"Roothide 关闭：rootful 已按联动规则强制关闭（下次越狱生效）" debug:NO];
+-    }
+-}
+ 
+ - (void)purgeRootfulPressed
+ {
+@@ -882,42 +781,6 @@
+     [[EUUIManager sharedInstance] sendLog:@"rootful purge 后端未落地（按钮已按实际能力隐藏）" debug:YES];
+ }
+ 
+-- (id)readCloakEnabled:(PSSpecifier *)specifier
+-{
+-    return [self readPreferenceValue:specifier];
+-}
+-
+-- (void)setCloakEnabled:(id)value specifier:(PSSpecifier *)specifier
+-{
+-    [self setPreferenceValue:value specifier:specifier];
+-    if (![[EUEnvironmentManager sharedManager] isJailbroken]) return;
+-    BOOL enable = ((NSNumber *)value).boolValue;
+-    // 系统级隐藏越狱痕迹（roothide 语义）：jbctl cloak enable/disable
+-    // （hideMounts/hideCredentials/hideTrustcache 默认随 enable 全开，cloakd 起 cover mount）
+-    int r = [[EUEnvironmentManager sharedManager] spawnJbctlAsRootWithArgs:
+-             @[@"cloak", enable ? @"enable" : @"disable"]];
+-    if (r != 0) {
+-        [[EUUIManager sharedInstance] sendLog:[NSString stringWithFormat:
+-            @"cloak %@ 失败（jbctl 返回 %d）", enable ? @"enable" : @"disable", r] debug:NO];
+-    }
+-}
+-
+-- (id)readAegisHidden:(PSSpecifier *)specifier
+-{
+-    return [self readPreferenceValue:specifier];
+-}
+-
+-- (void)setAegisHidden:(id)value specifier:(PSSpecifier *)specifier
+-{
+-    [self setPreferenceValue:value specifier:specifier];
+-    if (![[EUEnvironmentManager sharedManager] isJailbroken]) return;
+-    BOOL hide = ((NSNumber *)value).boolValue;
+-    // 越狱本体加入/移出 Aegis 隐藏策略（per-app；jbctl aegis add/remove，
+-    // aegisd 持久化到 /basebin/aegis.conf，重启越狱后仍然生效）
+-    NSString *selfBundleID = [[NSBundle mainBundle] bundleIdentifier] ?: @"dev.euphoria.Euphoria";
+-    [[EUEnvironmentManager sharedManager] spawnJbctlAsRootWithArgs:
+-     @[@"aegis", hide ? @"add" : @"remove", selfBundleID]];
+-}
+ 
+ 
+ @end
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/Application/Euphoria/en.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/en.lproj/Localizable.strings
+--- euphoria-v1007-pristine/Application/Euphoria/en.lproj/Localizable.strings	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/Application/Euphoria/en.lproj/Localizable.strings	2026-10-11 12:22:27.944068019 +0800
+@@ -132,6 +132,7 @@
+ "Section_Rootful" = "Rootful";
+ "Rootful_Mode" = "Rootful Mode";
+ "Rootful_Mode_Footer" = "On supported devices (A12/A13, iOS 16.6.1–18.7.1). First activation may take several minutes. Disabling keeps the volume and data.";
++"Rootful_Mode_Fixed_Footer" = "This build is rootful-only: every jailbreak mounts the real root filesystem, and the hidden environment (shielding) rides along automatically. The mode switch has been removed by design; supported devices are A12/A13 on iOS 16.6.1-18.7.1. Operator escape hatches (/basebin marker files) remain available for maintenance.";
+ "Button_Purge_Rootful" = "Erase Rootful Volume";
+ "Alert_Purge_Rootful_Title" = "Erase Rootful Volume";
+ "Alert_Purge_Rootful_Body" = "This uninstalls the rootful overlay, destroys the volume and clears its state. This cannot be undone. Continue?";
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/aegisd/src/main.c euphoria-v1007-src/BaseBin/aegisd/src/main.c
+--- euphoria-v1007-pristine/BaseBin/aegisd/src/main.c	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/aegisd/src/main.c	2026-10-11 11:48:05.643363762 +0800
+@@ -29,10 +29,13 @@
+  *   bundleId=level
+  * or a bare
+  *   bundleId
+- * (which defaults to AEGIS_LEVEL_FULL).  On startup aegisd parses the
+- * file and pushes the entries into launchdhook's runtime state; on any
+- * jbctl-driven mutation aegisd rewrites the file so the change survives
+- * a jailbreak restart.
++ * (which, since the 2026-10-11 deny-by-default flip, means TRUST: level 0 /
++ * AEGIS_LEVEL_OFF = the plain, unfiltered view).  On startup aegisd parses
++ * the file and pushes the entries into launchdhook's runtime state; the
++ * 10-second sync loop persists the whitelist back whenever it changes
++ * (P0-1), and the startup sequence re-arms the enabled flag unless
++ * /basebin/.aegis_disabled exists (P0-2) — so the whitelist and the switch
++ * both survive userspace reboots.
+  */
+ 
+ #define AEGIS_MOUNT_POINT "/private/var/.mobile_repair_cache"
+@@ -47,124 +50,172 @@
+ 
+ static int aegisd_do_mount(void)
+ {
+-	/* staging dir is just a marker directory in the jbroot */
+-	mkdir(AEGIS_STAGING_DIR, 0755);
++        /* staging dir is just a marker directory in the jbroot */
++        mkdir(AEGIS_STAGING_DIR, 0755);
+ 
+-	struct {
+-		char *fspec;
+-	} args = { .fspec = (char *)AEGIS_STAGING_DIR };
+-
+-	/* read-only nullfs view at an innocuous path */
+-	int rv = mount("nullfs", AEGIS_MOUNT_POINT, MNT_RDONLY | MNT_NOSUID | MNT_NOEXEC, &args);
+-	if (rv != 0 && errno != EEXIST) {
+-		/* mount failed — the marker file approach is the fallback */
+-		int fd = open(AEGIS_MOUNT_POINT "/.aegis_marker", O_CREAT | O_WRONLY, 0644);
+-		if (fd >= 0) close(fd);
+-	}
+-	gMounted = (rv == 0) || (errno == EEXIST) || (access(AEGIS_MOUNT_POINT "/.aegis_marker", F_OK) == 0);
+-	return rv;
++        struct {
++                char *fspec;
++        } args = { .fspec = (char *)AEGIS_STAGING_DIR };
++
++        /* read-only nullfs view at an innocuous path */
++        int rv = mount("nullfs", AEGIS_MOUNT_POINT, MNT_RDONLY | MNT_NOSUID | MNT_NOEXEC, &args);
++        if (rv != 0 && errno != EEXIST) {
++                /* mount failed — the marker file approach is the fallback */
++                int fd = open(AEGIS_MOUNT_POINT "/.aegis_marker", O_CREAT | O_WRONLY, 0644);
++                if (fd >= 0) close(fd);
++        }
++        gMounted = (rv == 0) || (errno == EEXIST) || (access(AEGIS_MOUNT_POINT "/.aegis_marker", F_OK) == 0);
++        return rv;
+ }
+ 
+ static void aegisd_do_unmount(void)
+ {
+-	if (gMounted) {
+-		unmount(AEGIS_MOUNT_POINT, MNT_FORCE);
+-		gMounted = false;
+-	}
++        if (gMounted) {
++                unmount(AEGIS_MOUNT_POINT, MNT_FORCE);
++                gMounted = false;
++        }
+ }
+ 
+ static void aegisd_report_mount(void)
+ {
+-	const char *err = (gMounted ? NULL : "mount failed");
+-	aegis_report_mount(gMounted ? AEGIS_MOUNT_POINT : "", err ? err : "");
++        const char *err = (gMounted ? NULL : "mount failed");
++        aegis_report_mount(gMounted ? AEGIS_MOUNT_POINT : "", err ? err : "");
+ }
+ 
+ /* ---- policy file I/O --------------------------------------------------- */
+ 
+ static void aegisd_push_policy_file(void)
+ {
+-	FILE *fp = fopen(JBROOT_PATH("/basebin/aegis.conf"), "r");
+-	if (!fp) return;
++        FILE *fp = fopen(JBROOT_PATH("/basebin/aegis.conf"), "r");
++        if (!fp) return;
+ 
+-	char line[512];
+-	while (fgets(line, sizeof(line), fp)) {
+-		/* trim */
+-		char *nl = strchr(line, '\n');
+-		if (nl) *nl = '\0';
+-		char *ws = line;
+-		while (*ws == ' ' || *ws == '\t') ws++;
+-		if (*ws == '\0' || *ws == '#') continue;
+-
+-		char *eq = strchr(ws, '=');
+-		uint64_t level = AEGIS_LEVEL_FULL;
+-		if (eq) {
+-			*eq = '\0';
+-			level = strtoull(eq + 1, NULL, 10);
+-		}
+-		aegis_add_app(ws, level);
+-	}
+-	fclose(fp);
++        char line[512];
++        while (fgets(line, sizeof(line), fp)) {
++                /* trim */
++                char *nl = strchr(line, '\n');
++                if (nl) *nl = '\0';
++                char *ws = line;
++                while (*ws == ' ' || *ws == '\t') ws++;
++                if (*ws == '\0' || *ws == '#') continue;
++
++                char *eq = strchr(ws, '=');
++                /* Deny-by-default flip: a bare id in aegis.conf now means
++                 * TRUST (level 0 = OFF = plain view). The file is the trust
++                 * whitelist since 2026-10-11; "id" without "=level" grants
++                 * trust, not shielding. */
++                uint64_t level = AEGIS_LEVEL_OFF;
++                if (eq) {
++                        *eq = '\0';
++                        level = strtoull(eq + 1, NULL, 10);
++                }
++                aegis_add_app(ws, level);
++        }
++        fclose(fp);
+ }
+ 
+ static void aegisd_write_policy_file(void)
+ {
+-	aegis_policy_t policy = { 0 };
+-	if (aegis_get_policy(&policy) != 0) return;
++        aegis_policy_t policy = { 0 };
++        if (aegis_get_policy(&policy) != 0) return;
+ 
+-	FILE *fp = fopen(JBROOT_PATH("/basebin/aegis.conf"), "w");
+-	if (!fp) return;
+-	for (uint32_t i = 0; i < policy.appCount; i++) {
+-		fprintf(fp, "%s=%llu\n", policy.appBundleIds[i],
+-			(unsigned long long)policy.appLevels[i]);
+-	}
+-	fclose(fp);
++        FILE *fp = fopen(JBROOT_PATH("/basebin/aegis.conf"), "w");
++        if (!fp) return;
++        for (uint32_t i = 0; i < policy.appCount; i++) {
++                fprintf(fp, "%s=%llu\n", policy.appBundleIds[i],
++                        (unsigned long long)policy.appLevels[i]);
++        }
++        fclose(fp);
+ }
+ 
+ /* ---- sync -------------------------------------------------------------- */
+ 
++/* P0-1 fix (2026-10-11): aegisd_write_policy_file used to be dead code —
++ * runtime mutations (jbctl aegis add/remove) never reached aegis.conf, so
++ * every jailbreak restart came back with the STALE list. The sync loop now
++ * fingerprints the runtime policy (FNV-1a over ids+levels+count) and
++ * rewrites the file whenever the fingerprint changes. With the
++ * deny-by-default flip the file IS the trust whitelist — persisting it is
++ * load-bearing, not cosmetic. */
+ static void aegisd_sync_with_policy(void)
+ {
+-	aegis_policy_t policy = { 0 };
+-	if (aegis_get_policy(&policy) != 0) return;
++        aegis_policy_t policy = { 0 };
++        if (aegis_get_policy(&policy) != 0) return;
+ 
+-	if (policy.enabled && !gMounted) {
+-		aegisd_do_mount();
+-		aegisd_report_mount();
+-	}
+-	else if (!policy.enabled && gMounted) {
+-		aegisd_do_unmount();
+-		aegisd_report_mount();
+-	}
+-	else if (gMounted) {
+-		aegisd_report_mount(); /* keep launchdhook state fresh */
+-	}
++        static uint64_t sLastFingerprint = 0;
++        static bool sHaveFingerprint = false;
++        uint64_t fingerprint = 1469598103934665603ULL; /* FNV-1a offset basis */
++        for (uint32_t i = 0; i < policy.appCount && i < AEGIS_MAX_APPS; i++) {
++                for (const char *p = policy.appBundleIds[i]; p && *p; p++) {
++                        fingerprint ^= (uint8_t)*p;
++                        fingerprint *= 1099511628211ULL;
++                }
++                fingerprint ^= (uint8_t)(policy.appLevels[i] & 0xFF);
++                fingerprint *= 1099511628211ULL;
++                fingerprint ^= 0x1F; /* entry separator */
++                fingerprint *= 1099511628211ULL;
++        }
++        fingerprint ^= (uint64_t)policy.appCount * 1099511628211ULL;
++        if (!sHaveFingerprint || fingerprint != sLastFingerprint) {
++                sLastFingerprint = fingerprint;
++                sHaveFingerprint = true;
++                aegisd_write_policy_file(); /* persist the (new) whitelist */
++        }
++
++        if (policy.enabled && !gMounted) {
++                aegisd_do_mount();
++                aegisd_report_mount();
++        }
++        else if (!policy.enabled && gMounted) {
++                aegisd_do_unmount();
++                aegisd_report_mount();
++        }
++        else if (gMounted) {
++                aegisd_report_mount(); /* keep launchdhook state fresh */
++        }
+ }
+ 
+ int main(int argc, char *argv[])
+ {
+-	if (geteuid() != 0) {
+-		fprintf(stderr, "aegisd: must run as root\n");
+-		return 1;
+-	}
+-
+-	signal(SIGTERM, aegisd_settle_signal);
+-	signal(SIGINT,  aegisd_settle_signal);
+-
+-	/* push persisted policy into runtime state, then sync mount */
+-	aegisd_push_policy_file();
+-	aegisd_sync_with_policy();
+-
+-	dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+-	if (timer) {
+-		dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 10LL * NSEC_PER_SEC), 10LL * NSEC_PER_SEC, 1LL * NSEC_PER_SEC);
+-		dispatch_source_set_event_handler(timer, ^{
+-			aegisd_sync_with_policy();
+-		});
+-		dispatch_resume(timer);
+-	}
++        if (geteuid() != 0) {
++                fprintf(stderr, "aegisd: must run as root\n");
++                return 1;
++        }
++
++        signal(SIGTERM, aegisd_settle_signal);
++        signal(SIGINT,  aegisd_settle_signal);
++
++        /* push persisted policy into runtime state, then sync mount */
++        aegisd_push_policy_file();
++
++        /* P0-2 fix (2026-10-11): restore the aegis master switch across
++         * userspace reboots. gAegisPolicy.enabled lives in launchdhook's
++         * memory and resets to false on every boot; the daemon-side enable
++         * call below re-arms it (through the XPC domain, which also bridges
++         * the flag into gSystemInfo for the App side). Marker semantics are
++         * identical to the jailbreak-time activation in euphoria/main.m:
++         * /basebin/.aegis_disabled is the ONLY persistent way to turn the
++         * shield off. Without this, every reboot silently disabled per-app
++         * shielding while aegisd kept running (the persisted whitelist then
++         * mattered for nothing). */
++        if (access(JBROOT_PATH("/basebin/.aegis_disabled"), F_OK) != 0) {
++                if (aegis_enable() != 0) {
++                        fprintf(stderr, "aegisd: WARNING: failed to restore aegis enabled state\n");
++                }
++        }
++
++        aegisd_sync_with_policy();
++
++        dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
++        if (timer) {
++                dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 10LL * NSEC_PER_SEC), 10LL * NSEC_PER_SEC, 1LL * NSEC_PER_SEC);
++                dispatch_source_set_event_handler(timer, ^{
++                        aegisd_sync_with_policy();
++                });
++                dispatch_resume(timer);
++        }
+ 
+-	dispatch_main();
++        dispatch_main();
+ 
+-	if (gQuit) aegisd_do_unmount();
+-	return 0;
++        if (gQuit) aegisd_do_unmount();
++        return 0;
+ }
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/euphoria/src/main.m euphoria-v1007-src/BaseBin/euphoria/src/main.m
+--- euphoria-v1007-pristine/BaseBin/euphoria/src/main.m	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/euphoria/src/main.m	2026-10-11 11:46:49.321971934 +0800
+@@ -381,55 +381,44 @@
+         fflush(stdout);
+ }
+ 
+-void activate_rootful_and_cloak(void)
++// Returns 0 on success, -1 when the run was explicitly REJECTED (device
++// outside the rootful support matrix — see D1 below).
++int activate_rootful_and_cloak(void)
+ {
+-        // Euphoria extension: rootful mode (in-memory rootfs remount + overlay
+-        // fallback) followed by cloak activation (stealth).
++        // Fixed-rootful rewrite (2026-10-11, user decision: "固定 rootful，
++        // 砍无根，保留隐藏"): this build is a rootful-ONLY build. The rootless
++        // jailbreak path and the roothide (rootless+hiding) mode have been
++        // removed by design. What survives:
++        //   - rootful engine: fakefs primary / remount+overlay fallback,
++        //     only on the A12/A13 @ iOS 16.6.1-18.7.1 support matrix;
++        //   - the hidden environment (cloak + aegis) rides along ALWAYS
++        //     (R4), with deny-by-default shielding (list = trust whitelist);
++        //   - marker files stay as the operator escape hatches:
++        //       /basebin/.rootful_disabled -> emergency rootless leg
++        //       /basebin/.cloak_disabled   -> keep the environment visible
++        //       /basebin/.aegis_disabled   -> disable per-app shielding
+         //
+-        // User hard requirement (2026-08-25 17:33 + 17:35): on A12/A13 @
+-        // iOS 15.0-18.7.1 rootful and the hidden environment are DEFAULT ON
+-        // (R4: cloak rides along everywhere rootful does);
+-        // explicit opt-out is possible through marker files:
+-        //   /basebin/.rootful_disabled  -> stay rootless even on the matrix
+-        //   /basebin/.cloak_disabled    -> keep the environment visible
+-        // Outside the matrix the default stays 1:1 with the upstream rootless
+-        // flow and hiding is left to the roothide default chain (App layer);
+-        // the old opt-in markers (.rootful_enabled / .cloak_enabled) still work
+-        // there for experimentation.
+-
+-        // User toggle semantics (2026-08-26 17:27):
+-        //   rootfulUserEnabled = false (DEFAULT) -> roothide mode:
+-        //       rootless jailbreak + cloak/aegis hiding (self-developed
+-        //       roothide equivalent)
+-        //   rootfulUserEnabled = true  -> rootful + roothide:
+-        //       rootful engine (fakefs primary / remount+overlay fallback)
+-        //       AND the full hiding stack, only on A12/A13 @ 16.6.1-18.7.1
+-        // The App Settings UI flips rootfulUserEnabled through the
+-        // jbsettings XPC domain; the jailbreak flow below branches on it,
+-        // so the two modes run genuinely different code paths.
+-
++        // D1 (decision, 2026-10-11): devices outside the matrix are REFUSED
++        // with an explicit error. The rootless fallback ("silently degrade
++        // to roothide") no longer exists, so "continue" would mean jail
++        // breaking against the user's contract ("越狱就是有根"). The refusal
++        // MUST happen here in the daemon — the App-side pre-check is only
++        // UX and can be bypassed; this check cannot. Upstream precedent:
++        // Dopamine errors out loudly on unsupported devices, roothide
++        // Bootstrap refuses to install; no "silent downgrade" exists in
++        // the ecosystem.
+         bool supported = rootful_supported_configuration();
+-        bool rootfulToggle = jbclient_jbsettings_get_bool("rootfulUserEnabled");
+-        // R37（用户 2026-08-29 00:11 定案）：roothide 是 rootful 的前置——
+-        // "选了 rootful 自动选 roothide；关了 roothide 就不能开 rootful"。
+-        // 服务端 jbsettings 写入侧已兜底联动，这里对存量状态再校验一次。
+-        bool roothideToggle = jbclient_jbsettings_get_bool("roothideUserEnabled");
+-        if (rootfulToggle && !roothideToggle) {
+-                printf("Rootful: roothide toggle is off -> rootful force-disabled (user rule 2026-08-29)\n");
+-                rootfulToggle = false;
+-        }
++        bool rootfulToggle = true; // fixed-rootful build: the toggle is gone
+         bool rootfulWanted = supported && rootfulToggle
+                 && (access(JBROOT_PATH("/basebin/.rootful_disabled"), F_OK) != 0);
+-        // Hiding (the "roothide" leg) is wanted in BOTH modes and on every
+-        // supported configuration; only explicit marker files can opt out.
++        // Hiding (cloak + aegis) is wanted ALWAYS; only marker files opt out.
+         bool cloakWanted = (access(JBROOT_PATH("/basebin/.cloak_disabled"), F_OK) != 0);
+         bool aegisWanted = (access(JBROOT_PATH("/basebin/.aegis_disabled"), F_OK) != 0);
+ 
+-        // If the user turned the rootful toggle on but this device is outside
+-        // the A12/A13 @ 16.6.1-18.7.1 matrix, say so explicitly and continue
+-        // in roothide mode (the App UI also greys the toggle out).
+-        if (rootfulToggle && !supported) {
+-                printf("Rootful: toggle is on but this device is outside the supported matrix (need A12/A13, iOS 16.6.1 - 18.7.1); continuing in roothide mode\n");
++        if (!supported) {
++                printf("Rootful: REJECTED — this device is outside the supported matrix (need A12/A13, iOS 16.6.1 - 18.7.1). This build is rootful-only by design: the rootless/roothide fallback has been removed, so there is no legal jailbreak path here. Aborting this jailbreak run.\n");
++                fflush(stdout);
++                return -1;
+         }
+ 
+         if (rootfulWanted) {
+@@ -451,26 +440,29 @@
+                 if (cloak_enable() == 0) {
+                         // cloakd (loaded through the basebin LaunchDaemons directory)
+                         // will bring up the cover mount within seconds and report back
+-                        // R38（用户 2026-08-29 11:41 定案）：屏蔽软件双形态——
+-                        //   深档（rootful 态）：stealthLevel=3+三 hide 全开。
+-                        //     rootful 挂载面更大（fakefs/overlay 六目录），检测面也更大，
+-                        //     全 hide+激进 stealth（getfsstat 白名单外的挂载全隐）。
+-                        //   基础档（普通 roothide）：stealthLevel=1+三 hide 全开。
+-                        //     jbroot/bind 隐藏足够，挂载白名单宽松（系统卷正常露出）。
+-                        // 形态由 rootfulWanted 决定（rootful 捆绑 roothide，R37 联动），
+-                        // 每次越狱重放（幂等），用户手动 set_options 仍可覆盖。
++                        //
++                        // Fixed-rootful build: there is exactly ONE form now —
++                        // the deep one. stealthLevel is pinned to 3 (rootful
++                        // mounts more (fakefs/overlay six dirs), so the
++                        // detection surface is larger too: full hide +
++                        // aggressive stealth (getfsstat: everything outside
++                        // the mount whitelist is dropped)). Replayed on every
++                        // jailbreak (idempotent); a manual set_options still
++                        // overrides until the next replay.
+                         cloak_policy_t cloakPolicy = { 0 };
+                         cloak_get_policy(&cloakPolicy);
+                         cloakPolicy.hideMounts      = true;
+                         cloakPolicy.hideCredentials = true;
+                         cloakPolicy.hideTrustcache  = true;
+-                        cloakPolicy.stealthLevel    = rootfulWanted ? 3 : 1;
+-                        // R40（用户 2026-08-29 17:00）：黑名单制默认开——拉黑的 app
+-                        // 检测不到越狱；名单外（文件管理器等越狱生态工具）正常可见。
+-                        cloakPolicy.blacklistMode   = true;
++                        cloakPolicy.stealthLevel    = 3; // fixed (rootful/deep form is the only form)
++                        // Flip #1 (2026-10-11): whitelist mode. The aegis list
++                        // is a TRUST whitelist — processes on it see the full
++                        // picture (file managers & co), everything else is
++                        // shielded. See cloak_interpose.c Flip #2 for the
++                        // matching semantics change.
++                        cloakPolicy.blacklistMode   = false;
+                         if (cloak_set_options(&cloakPolicy) == 0) {
+-                                printf("Cloak: enabled (%s form, stealth %llu)\n",
+-                                        rootfulWanted ? "rootful/deep" : "roothide/basic",
++                                printf("Cloak: enabled (rootful/deep form, stealth %llu, whitelist mode)\n",
+                                         (unsigned long long)cloakPolicy.stealthLevel);
+                         }
+                         else {
+@@ -484,18 +476,30 @@
+ 
+         if (aegisWanted) {
+                 if (aegis_enable() == 0) {
+-                        // aegisd (loaded through the basebin LaunchDaemons directory)
+-                        // brings up the cover mount and owns the per-app policy file
++                        // aegisd (loaded through the basebin LaunchDaemons
++                        // directory) brings up the cover mount, restores the
++                        // persisted trust whitelist (aegis.conf, P0-1) and
++                        // keeps it in sync.
+                         printf("Aegis: enabled (per-app shielding ready)\n");
+                 }
+                 else {
+                         printf("Aegis: enable failed\n");
+                 }
+         }
++
++        return 0;
+ }
+ 
+ void install_euphoria(void)
+ {
++        // D1 (fixed-rootful build): refuse up front, zero-destructive — do
++        // not even stage basebin on a device that can never legally use it.
++        if (!rootful_supported_configuration()) {
++                printf("Rootful: REJECTED — device outside the A12/A13 @ iOS 16.6.1-18.7.1 matrix. This build is rootful-only; install aborted.\n");
++                fflush(stdout);
++                return;
++        }
++
+         activate_environment(false, true);
+ 
+         install_basebin_gen();
+@@ -507,13 +511,28 @@
+         finalize_bootstrap_if_needed(NULL);
+         load_var_jb_daemons();
+ 
+-        activate_rootful_and_cloak();
++        if (activate_rootful_and_cloak() != 0) {
++                // D1 rejection at the activation gate: nothing was activated,
++                // leave the marker absent so the run reads as "not jailbroken"
++                // (R34 transactional marker) and can be re-run idempotently.
++                printf("Euphoria: install aborted (rootful matrix rejection)\n");
++                fflush(stdout);
++                return;
++        }
+ 
+         printf("Euphoria installed!\n");
+ }
+ 
+ void install_euphoria_from_tarball(const char *tarballPath, const char *bootstrapPath)
+ {
++        // D1: the tarball leg re-execs into "install", which carries the same
++        // zero-destructive matrix pre-check — refuse before staging anything.
++        if (!rootful_supported_configuration()) {
++                printf("Rootful: REJECTED — device outside the A12/A13 @ iOS 16.6.1-18.7.1 matrix. This build is rootful-only; install aborted.\n");
++                fflush(stdout);
++                return;
++        }
++
+         [[NSFileManager defaultManager] removeItemAtPath:@"/private/preboot/euphoria_tmp" error:nil];
+         [[NSFileManager defaultManager] createDirectoryAtPath:@"/private/preboot/euphoria_tmp" withIntermediateDirectories:NO attributes:nil error:nil];
+         libarchive_unarchive(tarballPath, "/private/preboot/euphoria_tmp");
+@@ -533,6 +552,16 @@
+ 
+ void activate_euphoria(void)
+ {
++        // D1 (fixed-rootful build): refuse before touching anything. The
++        // marker is not yet unlinked on this path, so a rejected re-run on an
++        // already-jailbroken device changes nothing; on a fresh device
++        // nothing is staged. Zero destructive either way.
++        if (!rootful_supported_configuration()) {
++                printf("Rootful: REJECTED — device outside the A12/A13 @ iOS 16.6.1-18.7.1 matrix. This build is rootful-only; activation aborted.\n");
++                fflush(stdout);
++                return;
++        }
++
+         // R34：事务式越狱标记——流程起点清标记（半程=未越狱，可幂等重跑）
+         unlink(JBROOT_PATH("/basebin/.bootstrap_complete"));
+ 
+@@ -545,7 +574,14 @@
+         finalize_bootstrap_if_needed(NULL);
+         load_var_jb_daemons();
+ 
+-        activate_rootful_and_cloak();
++        if (activate_rootful_and_cloak() != 0) {
++                // D1 rejection mid-flow: the completion marker is NOT written,
++                // so is_jailbroken keeps reading "not yet" (R34 transactional
++                // marker) and the whole activation can be re-run idempotently.
++                printf("Euphoria: activation aborted (rootful matrix rejection)\n");
++                fflush(stdout);
++                return;
++        }
+ 
+         // R34：全流程（bootstrap→守护进程→rootful/cloak）走完才打完成标记；
+         // launchdhook 的 is_jailbroken 判定要求 .version + .bootstrap_complete 双证。
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/jbctl/src/main.m euphoria-v1007-src/BaseBin/jbctl/src/main.m
+--- euphoria-v1007-pristine/BaseBin/jbctl/src/main.m	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/jbctl/src/main.m	2026-10-11 11:48:20.062815649 +0800
+@@ -18,430 +18,435 @@
+ 
+ void print_usage(void)
+ {
+-	printf("Usage: jbctl <command> <arguments>\n\
++        printf("Usage: jbctl <command> <arguments>\n\
+ Available commands:\n\
+-	proc_set_debugged <pid>\t\tMarks the process with the given pid as being debugged, allowing invalid code pages inside of it\n\
+-	trustcache info\t\t\tPrint info about all jailbreak related trustcaches and the cdhashes contained in them\n\
+-	trustcache clear\t\tClears all existing cdhashes from the jailbreaks trustcache\n\
+-	trustcache add <cdhash>\t\tAdd an arbitrary cdhash to the jailbreaks trustcache\n\
+-	update <tipa/basebin/tarball> <path>\tInitiates a jailbreak update either based on a TIPA, based on a basebin.tar file or based on a standalone tarball, TIPA installation depends on TrollStore, afterwards it triggers a userspace reboot\n");
++        proc_set_debugged <pid>\t\tMarks the process with the given pid as being debugged, allowing invalid code pages inside of it\n\
++        trustcache info\t\t\tPrint info about all jailbreak related trustcaches and the cdhashes contained in them\n\
++        trustcache clear\t\tClears all existing cdhashes from the jailbreaks trustcache\n\
++        trustcache add <cdhash>\t\tAdd an arbitrary cdhash to the jailbreaks trustcache\n\
++        update <tipa/basebin/tarball> <path>\tInitiates a jailbreak update either based on a TIPA, based on a basebin.tar file or based on a standalone tarball, TIPA installation depends on TrollStore, afterwards it triggers a userspace reboot\n");
+ }
+ 
+ int main(int argc, char* argv[])
+ {
+-	if (!strcmp(argv[argc-1], "earlyboot")) {
+-		// If jbctl is spawned in "early boot" state, the jbserver port needs to be obtained from registeredPorts[0] instead
+-		mach_port_t *registeredPorts;
+-		mach_msg_type_number_t registeredPortsCount = 0;
+-		if (mach_ports_lookup(mach_task_self(), &registeredPorts, &registeredPortsCount) == KERN_SUCCESS) {
+-			jbclient_xpc_set_custom_port(registeredPorts[0]);
+-
+-			for(mach_msg_type_number_t i = 1; i < registeredPortsCount; i++) {
+-				mach_port_deallocate(mach_task_self(), registeredPorts[i]);
+-			}
+-			vm_deallocate(mach_task_self(), (vm_address_t)registeredPorts, registeredPortsCount * sizeof(mach_port_t));
+-		}
+-	}
+-
+-	setvbuf(stdout, NULL, _IOLBF, 0);
+-	if (argc < 2) {
+-		print_usage();
+-		return 1;
+-	}
+-
+-	if (getuid() != 0 && geteuid() == 0) {
+-		// When jailbroken the Euphoria app cannot have uid 0 because it can't drop it anymore without loosing it
+-		// So in some cases (e.g. for spawning dpkg) we need to use jbctl to get it
+-		setuid(0);
+-	}
+-
+-	if (argc > 2) {
+-		if (!strcmp(argv[argc-2], "--waitfor")) {
+-			// When the Euphoria app spawns jbctl it needs to clean up it's own ucred before jbctl does the requested action
+-			// For this it will attach a pipe fd and write to it once the cleanup is done, so we need to wait until that write happens
+-			int fd = atoi(argv[argc-1]);
+-			int r = 0;
+-			read(fd, &r, sizeof(r));
+-			close(fd);
+-		}
+-	}
+-
+-	const char *rootPath = jbclient_get_jbroot();
+-	if (rootPath) {
+-		gSystemInfo.jailbreakInfo.rootPath = strdup(rootPath);
+-	}
+-
+-	char *cmd = argv[1];
+-	if (!strcmp(cmd, "proc_set_debugged")) {
+-		if (argc != 3) {
+-			print_usage();
+-			return 1;
+-		}
+-		int pid = atoi(argv[2]);
+-		int64_t result = jbclient_platform_set_process_debugged(pid, true);
+-		if (result == 0) {
+-			printf("Successfully marked proc of pid %d as debugged\n", pid);
+-		}
+-		else {
+-			printf("Failed to mark proc of pid %d as debugged\n", pid);
+-		}
+-	}
+-	else if (!strcmp(cmd, "trustcache")) {
+-		if (argc < 3) {
+-			print_usage();
+-			return 2;
+-		}
+-		if (getuid() != 0) {
+-			printf("ERROR: trustcache subcommand requires root.\n");
+-			return 3;
+-		}
+-		const char *trustcacheCmd = argv[2];
+-		if (!strcmp(trustcacheCmd, "info")) {
+-			xpc_object_t tcArr = nil;
+-			if (jbclient_root_trustcache_info(&tcArr) == 0) {
+-				size_t tcCount = xpc_array_get_count(tcArr);
+-				for (size_t i = 0; i < tcCount; i++) {
+-					xpc_object_t tc = xpc_array_get_dictionary(tcArr, i);
+-					size_t uuidLength = 0;
+-					const void *uuidData = xpc_dictionary_get_data(tc, "uuid", &uuidLength);
+-					xpc_object_t cdhashesArr = xpc_dictionary_get_array(tc, "cdhashes");
+-					if (uuidData && cdhashesArr) {
+-						size_t length = xpc_array_get_count(cdhashesArr);
+-						char uuidString[uuidLength * 2 + 1];
+-						convert_data_to_hex_string(uuidData, uuidLength, uuidString);
+-						printf("Jailbreak Trustcache %zd <UUID: %s> (length: %zd)\n", i, uuidString, length);
+-						for (size_t j = 0; j < length; j++) {
+-							size_t cdhashLength = 0;
+-							const void *cdhashData = xpc_array_get_data(cdhashesArr, j, &cdhashLength);
+-							if (cdhashData) {
+-								char cdhashString[cdhashLength * 2 + 1];
+-								convert_data_to_hex_string(cdhashData, cdhashLength, cdhashString);
+-								printf("| %zd:\t%s\n", j+1, cdhashString);
+-							}
+-						}
+-					}
+-				}
+-			}
+-			return 0;
+-		}
+-		else if (!strcmp(trustcacheCmd, "clear")) {
+-			return jbclient_root_trustcache_clear();
+-		}
+-		else if (!strcmp(trustcacheCmd, "add")) {
+-			if (argc < 4) {
+-				print_usage();
+-				return 2;
+-			}
+-			const char *cdhashString = argv[3];
+-			if (strlen(cdhashString) != (sizeof(cdhash_t) * 2)) {
+-				printf("ERROR: passed cdhash has wrong length\n");
+-				return 2;
+-			}
+-			cdhash_t cdhash;
+-			if (convert_hex_string_to_data(cdhashString, &cdhash)) {
+-				printf("ERROR: passed cdhash is malformed\n");
+-				return 2;
+-			}
+-			return jbclient_root_trustcache_add_cdhash(cdhash, sizeof(cdhash));
+-		}
+-	}
+-	else if (!strcmp(cmd, "reboot_userspace")) {
+-		return reboot3(RB2_USERREBOOT);
+-	}
+-	else if (!strcmp(cmd, "respring")) {
+-		const char *sbreloadPath = JBROOT_PATH("/usr/bin/sbreload");
+-		if (execve(sbreloadPath, (char *[]){ (char *)sbreloadPath, NULL }, environ) != 0) {
+-			killall("/usr/libexec/backboardd", SIGTERM);
+-		}
+-	}
+-	else if (!strcmp(cmd, "rebuild_icon_cache")) {
+-		BOOL suc = [[LSApplicationWorkspace defaultWorkspace] _LSPrivateRebuildApplicationDatabasesForSystemApps:YES internal:YES user:YES];
+-		return suc ? 0 : -1;
+-	}
+-	else if (!strcmp(cmd, "update")) {
+-		if (argc < 4) {
+-			print_usage();
+-			return 2;
+-		}
+-		char *updateType = argv[2];
+-		char *updateFile = argv[3];
+-		if (access(updateFile, F_OK) != 0) {
+-			printf("ERROR: File %s does not exist\n", updateFile);
+-			return 3;
+-		}
+-
+-		if (!strcmp(updateType, "tipa")) {
+-			setsid();
+-
+-			LSApplicationProxy *trollstoreAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"com.opa334.TrollStore"];
+-			if (!trollstoreAppProxy || !trollstoreAppProxy.installed) {
+-				printf("Unable to locate TrollStore, doesn't seem like it's installed.\n");
+-				return 4;
+-			}
+-			NSString *trollstorehelperPath = [trollstoreAppProxy.bundleURL.path stringByAppendingPathComponent:@"trollstorehelper"];
+-			int r = exec_cmd(trollstorehelperPath.fileSystemRepresentation, "install", "skip-uicache", "force", updateFile, NULL);
+-			if (r != 0) {
+-				printf("Failed to install tipa via TrollStore: %d\n", r);
+-				return 5;
+-			}
+-
+-			LSApplicationProxy *euphoriaAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"dev.euphoria.Euphoria"];
+-			if (!euphoriaAppProxy) {
+-				printf("Unable to locate newly installed Euphoria build.\n");
+-				return 6;
+-			}
+-			updateFile = strdup([euphoriaAppProxy.bundleURL.path stringByAppendingPathComponent:@"basebin.tar"].fileSystemRepresentation);
+-			// Fall through to basebin installation
+-		}
+-		else if (!strcmp(updateType, "tarball")) {
+-			NSString *tmpPath = [@"/tmp" stringByAppendingPathComponent:[NSUUID UUID].UUIDString];
+-			[[NSFileManager defaultManager] createDirectoryAtPath:tmpPath withIntermediateDirectories:NO attributes:nil error:nil];
+-			int r = libarchive_unarchive(updateFile, tmpPath.fileSystemRepresentation);
+-			if (r != 0) {
+-				printf("Failed to extract tarball: %d\n", r);
+-				return 7;
+-			}
+-			updateFile = strdup([tmpPath stringByAppendingPathComponent:@"basebin.tar"].fileSystemRepresentation);
+-			// Fall through to basebin installation
+-		}
+-		else if (strcmp(updateType, "basebin") != 0) {
+-			// If type is not tipa, tarball or basebin, bail out
+-			print_usage();
+-			return 2;
+-		}
+-
+-		int64_t result = jbclient_platform_stage_jailbreak_update(updateFile);
+-		if (result == 0) {
+-			printf("Staged update for installation during the next userspace reboot, userspace rebooting now...\n");
+-			usleep(10000);
+-			return reboot3(RB2_USERREBOOT);
+-		}
+-		else {
+-			printf("Staging update failed with error code %lld\n", result);
+-			return result;
+-		}
+-	}
+-	else if (!strcmp(cmd, "internal")) {
+-		if (getuid() != 0) return 41;
+-		if (argc < 3) return 42;
+-
+-		const char *internalCmd = argv[2];
+-		return jbctl_handle_internal(internalCmd, argc-2, &argv[2]);
+-	}
+-
+-		else if (!strcmp(cmd, "rootful")) {
+-		        if (getuid() != 0) {
+-		                printf("Error: rootful requires root\n");
+-		                return 41;
+-		        }
+-		        if (argc < 3) {
+-		                printf("Usage: jbctl rootful <status|enable|disable>\n");
+-		                return 1;
+-		        }
+-		        const char *rootfulCmd = argv[2];
+-		        if (!strcmp(rootfulCmd, "status")) {
+-		                rootful_status_t status = { 0 };
+-		                int r = rootful_get_status(&status);
+-		                if (r != 0) {
+-		                        printf("Error: rootful_get_status failed (%s)\n", strerror(r));
+-		                        return r;
+-		                }
+-		                printf("Rootful mode:\n");
+-		                printf("  Root filesystem remounted read-write: %s\n", status.rootMountedRW ? "yes" : "no");
+-		                printf("  Overlay mounts active:               %s\n", status.overlayActive ? "yes" : "no");
+-		                printf("  Configuration supported:             %s\n", rootful_supported_configuration() ? "yes" : "no");
+-		                printf("  Last error:                          %s\n", status.lastError[0] ? status.lastError : "none");
+-		                return 0;
+-		        }
+-		        else if (!strcmp(rootfulCmd, "enable")) {
+-		                rootful_status_t status = { 0 };
+-		                int r = rootful_enable(true, &status);
+-		                if (r != 0) {
+-		                        printf("Error: rootful_enable failed (%s)\n", strerror(r));
+-		                        return r;
+-		                }
+-		                printf("Rootful mode enabled (root RW: %s, overlays: %s)\n",
+-		                        status.rootMountedRW ? "yes" : "no",
+-		                        status.overlayActive ? "yes" : "no");
+-		                return 0;
+-		        }
+-		        else if (!strcmp(rootfulCmd, "disable")) {
+-		                int r = rootful_disable();
+-		                if (r != 0) {
+-		                        printf("Error: rootful_disable failed (%s)\n", strerror(r));
+-		                        return r;
+-		                }
+-		                printf("Rootful mode disabled\n");
+-		                return 0;
+-		        }
+-		        printf("Usage: jbctl rootful <status|enable|disable>\n");
+-		        return 1;
+-		}
+-		else if (!strcmp(cmd, "cloak")) {
+-		        if (getuid() != 0) {
+-		                printf("Error: cloak requires root\n");
+-		                return 41;
+-		        }
+-		        if (argc < 3) {
+-		                printf("Usage: jbctl cloak <status|enable|disable|set> [options]\n");
+-		                return 1;
+-		        }
+-		        const char *cloakCmd = argv[2];
+-		        if (!strcmp(cloakCmd, "status")) {
+-		                cloak_policy_t policy = { 0 };
+-		                if (cloak_get_policy(&policy) != 0) {
+-		                        printf("Error: unable to query cloak policy\n");
+-		                        return 1;
+-		                }
+-		                cloak_mount_status_t mnt = { 0 };
+-		                cloak_get_mount_status(&mnt);
+-		                printf("Cloak (stealth) mode:\n");
+-		                printf("  Enabled:          %s\n", policy.enabled ? "yes" : "no");
+-		                printf("  Hide mounts:      %s\n", policy.hideMounts ? "yes" : "no");
+-		                printf("  Hide credentials: %s\n", policy.hideCredentials ? "yes" : "no");
+-		                printf("  Hide trustcache:  %s\n", policy.hideTrustcache ? "yes" : "no");
+-		                printf("  Stealth level:    %llu\n", (unsigned long long)policy.stealthLevel);
+-		                printf("  Cover mount:      %s\n", mnt.active ? mnt.mountPoint : "not mounted");
+-		                if (mnt.error[0]) printf("  Last error:       %s\n", mnt.error);
+-		                return 0;
+-		        }
+-		        else if (!strcmp(cloakCmd, "enable")) {
+-		                int r = cloak_enable();
+-		                if (r != 0) {
+-		                        printf("Error: cloak_enable failed\n");
+-		                        return r;
+-		                }
+-		                printf("Cloak enabled (cloakd will bring up the cover mount)\n");
+-		                return 0;
+-		        }
+-		        else if (!strcmp(cloakCmd, "disable")) {
+-		                int r = cloak_disable();
+-		                if (r != 0) {
+-		                        printf("Error: cloak_disable failed\n");
+-		                        return r;
+-		                }
+-		                printf("Cloak disabled\n");
+-		                return 0;
+-		        }
+-		        else if (!strcmp(cloakCmd, "set")) {
+-		                // jbctl cloak set hideMounts=1 hideCredentials=1 hideTrustcache=1 stealthLevel=2
+-		                cloak_policy_t policy = { 0 };
+-		                if (cloak_get_policy(&policy) != 0) {
+-		                        printf("Error: unable to query cloak policy\n");
+-		                        return 1;
+-		                }
+-		                for (int i = 3; i < argc; i++) {
+-		                        char *arg = argv[i];
+-		                        char *eq = strchr(arg, '=');
+-		                        if (!eq) continue;
+-		                        *eq = '\0';
+-		                        const char *key = arg;
+-		                        const char *value = eq + 1;
+-		                        if (!strcmp(key, "hideMounts")) policy.hideMounts = atoi(value);
+-		                        else if (!strcmp(key, "hideCredentials")) policy.hideCredentials = atoi(value);
+-		                        else if (!strcmp(key, "hideTrustcache")) policy.hideTrustcache = atoi(value);
+-		                        else if (!strcmp(key, "stealthLevel")) policy.stealthLevel = strtoull(value, NULL, 10);
+-		                        // R40: blacklistMode=<0|1>（黑名单制开关——拉黑的 app 才被过滤）
+-		                        else if (!strcmp(key, "blacklistMode")) policy.blacklistMode = (strtoull(value, NULL, 10) != 0);
+-		                }
+-		                int r = cloak_set_options(&policy);
+-		                if (r != 0) {
+-		                        printf("Error: cloak_set_options failed\n");
+-		                        return r;
+-		                }
+-		                printf("Cloak options updated\n");
+-		                return 0;
+-		        }
+-		        printf("Usage: jbctl cloak <status|enable|disable|set> [options]\n");
+-		        return 1;
+-		}
+-
+-	else if (!strcmp(cmd, "aegis")) {
+-		if (getuid() != 0) {
+-			printf("Error: aegis requires root\n");
+-			return 41;
+-		}
+-		if (argc < 3) {
+-			printf("Usage: jbctl aegis <status|enable|disable|set-level|add|remove|list|clear> [args]\n");
+-			return 1;
+-		}
+-		const char *aegisCmd = argv[2];
+-		if (!strcmp(aegisCmd, "status")) {
+-			aegis_policy_t policy = { 0 };
+-			if (aegis_get_policy(&policy) != 0) {
+-				printf("Error: unable to query aegis policy\n");
+-				return 1;
+-			}
+-			printf("Aegis (per-app shielding):\n");
+-			printf("  Enabled:        %s\n", policy.enabled ? "yes" : "no");
+-			printf("  Default level:  %llu\n", (unsigned long long)policy.defaultLevel);
+-			printf("  Shielded apps:  %u\n", policy.appCount);
+-			for (uint32_t i = 0; i < policy.appCount && i < AEGIS_MAX_APPS; i++) {
+-				printf("    %s (level %llu)\n", policy.appBundleIds[i], (unsigned long long)policy.appLevels[i]);
+-			}
+-			return 0;
+-		}
+-		else if (!strcmp(aegisCmd, "enable")) {
+-			int r = aegis_enable();
+-			if (r != 0) { printf("Error: aegis_enable failed\n"); return r; }
+-			printf("Aegis enabled (aegisd will bring up the cover mount)\n");
+-			return 0;
+-		}
+-		else if (!strcmp(aegisCmd, "disable")) {
+-			int r = aegis_disable();
+-			if (r != 0) { printf("Error: aegis_disable failed\n"); return r; }
+-			printf("Aegis disabled\n");
+-			return 0;
+-		}
+-		else if (!strcmp(aegisCmd, "set-level")) {
+-			if (argc < 4) { printf("Usage: jbctl aegis set-level <0=off|1=lite|2=full|3=paranoid>\n"); return 1; }
+-			uint64_t level = strtoull(argv[3], NULL, 10);
+-			int r = aegis_set_default_level(level);
+-			if (r != 0) { printf("Error: aegis_set_default_level failed\n"); return r; }
+-			printf("Aegis default level set to %llu\n", (unsigned long long)level);
+-			return 0;
+-		}
+-		else if (!strcmp(aegisCmd, "add")) {
+-			if (argc < 4) { printf("Usage: jbctl aegis add <bundleId> [level]\n"); return 1; }
+-			const char *bid = argv[3];
+-			uint64_t level = (argc >= 5) ? strtoull(argv[4], NULL, 10) : AEGIS_LEVEL_FULL;
+-			int r = aegis_add_app(bid, level);
+-			if (r != 0) { printf("Error: aegis_add_app failed\n"); return r; }
+-			printf("Aegis: added %s at level %llu\n", bid, (unsigned long long)level);
+-			return 0;
+-		}
+-		else if (!strcmp(aegisCmd, "remove")) {
+-			if (argc < 4) { printf("Usage: jbctl aegis remove <bundleId>\n"); return 1; }
+-			int r = aegis_remove_app(argv[3]);
+-			if (r != 0) { printf("Error: aegis_remove_app failed\n"); return r; }
+-			printf("Aegis: removed %s\n", argv[3]);
+-			return 0;
+-		}
+-		else if (!strcmp(aegisCmd, "clear")) {
+-			int r = aegis_clear_apps();
+-			if (r != 0) { printf("Error: aegis_clear_apps failed\n"); return r; }
+-			printf("Aegis: app list cleared\n");
+-			return 0;
+-		}
+-		else if (!strcmp(aegisCmd, "list")) {
+-			aegis_policy_t policy = { 0 };
+-			if (aegis_get_policy(&policy) != 0) {
+-				printf("Error: unable to query aegis policy\n");
+-				return 1;
+-			}
+-			if (policy.appCount == 0) {
+-				printf("No apps in aegis shield list\n");
+-			}
+-			else {
+-				for (uint32_t i = 0; i < policy.appCount && i < AEGIS_MAX_APPS; i++) {
+-					printf("%s\t%llu\n", policy.appBundleIds[i], (unsigned long long)policy.appLevels[i]);
+-				}
+-			}
+-			return 0;
+-		}
+-		printf("Usage: jbctl aegis <status|enable|disable|set-level|add|remove|list|clear> [args]\n");
+-		return 1;
+-	}
++        if (!strcmp(argv[argc-1], "earlyboot")) {
++                // If jbctl is spawned in "early boot" state, the jbserver port needs to be obtained from registeredPorts[0] instead
++                mach_port_t *registeredPorts;
++                mach_msg_type_number_t registeredPortsCount = 0;
++                if (mach_ports_lookup(mach_task_self(), &registeredPorts, &registeredPortsCount) == KERN_SUCCESS) {
++                        jbclient_xpc_set_custom_port(registeredPorts[0]);
++
++                        for(mach_msg_type_number_t i = 1; i < registeredPortsCount; i++) {
++                                mach_port_deallocate(mach_task_self(), registeredPorts[i]);
++                        }
++                        vm_deallocate(mach_task_self(), (vm_address_t)registeredPorts, registeredPortsCount * sizeof(mach_port_t));
++                }
++        }
++
++        setvbuf(stdout, NULL, _IOLBF, 0);
++        if (argc < 2) {
++                print_usage();
++                return 1;
++        }
++
++        if (getuid() != 0 && geteuid() == 0) {
++                // When jailbroken the Euphoria app cannot have uid 0 because it can't drop it anymore without loosing it
++                // So in some cases (e.g. for spawning dpkg) we need to use jbctl to get it
++                setuid(0);
++        }
++
++        if (argc > 2) {
++                if (!strcmp(argv[argc-2], "--waitfor")) {
++                        // When the Euphoria app spawns jbctl it needs to clean up it's own ucred before jbctl does the requested action
++                        // For this it will attach a pipe fd and write to it once the cleanup is done, so we need to wait until that write happens
++                        int fd = atoi(argv[argc-1]);
++                        int r = 0;
++                        read(fd, &r, sizeof(r));
++                        close(fd);
++                }
++        }
++
++        const char *rootPath = jbclient_get_jbroot();
++        if (rootPath) {
++                gSystemInfo.jailbreakInfo.rootPath = strdup(rootPath);
++        }
++
++        char *cmd = argv[1];
++        if (!strcmp(cmd, "proc_set_debugged")) {
++                if (argc != 3) {
++                        print_usage();
++                        return 1;
++                }
++                int pid = atoi(argv[2]);
++                int64_t result = jbclient_platform_set_process_debugged(pid, true);
++                if (result == 0) {
++                        printf("Successfully marked proc of pid %d as debugged\n", pid);
++                }
++                else {
++                        printf("Failed to mark proc of pid %d as debugged\n", pid);
++                }
++        }
++        else if (!strcmp(cmd, "trustcache")) {
++                if (argc < 3) {
++                        print_usage();
++                        return 2;
++                }
++                if (getuid() != 0) {
++                        printf("ERROR: trustcache subcommand requires root.\n");
++                        return 3;
++                }
++                const char *trustcacheCmd = argv[2];
++                if (!strcmp(trustcacheCmd, "info")) {
++                        xpc_object_t tcArr = nil;
++                        if (jbclient_root_trustcache_info(&tcArr) == 0) {
++                                size_t tcCount = xpc_array_get_count(tcArr);
++                                for (size_t i = 0; i < tcCount; i++) {
++                                        xpc_object_t tc = xpc_array_get_dictionary(tcArr, i);
++                                        size_t uuidLength = 0;
++                                        const void *uuidData = xpc_dictionary_get_data(tc, "uuid", &uuidLength);
++                                        xpc_object_t cdhashesArr = xpc_dictionary_get_array(tc, "cdhashes");
++                                        if (uuidData && cdhashesArr) {
++                                                size_t length = xpc_array_get_count(cdhashesArr);
++                                                char uuidString[uuidLength * 2 + 1];
++                                                convert_data_to_hex_string(uuidData, uuidLength, uuidString);
++                                                printf("Jailbreak Trustcache %zd <UUID: %s> (length: %zd)\n", i, uuidString, length);
++                                                for (size_t j = 0; j < length; j++) {
++                                                        size_t cdhashLength = 0;
++                                                        const void *cdhashData = xpc_array_get_data(cdhashesArr, j, &cdhashLength);
++                                                        if (cdhashData) {
++                                                                char cdhashString[cdhashLength * 2 + 1];
++                                                                convert_data_to_hex_string(cdhashData, cdhashLength, cdhashString);
++                                                                printf("| %zd:\t%s\n", j+1, cdhashString);
++                                                        }
++                                                }
++                                        }
++                                }
++                        }
++                        return 0;
++                }
++                else if (!strcmp(trustcacheCmd, "clear")) {
++                        return jbclient_root_trustcache_clear();
++                }
++                else if (!strcmp(trustcacheCmd, "add")) {
++                        if (argc < 4) {
++                                print_usage();
++                                return 2;
++                        }
++                        const char *cdhashString = argv[3];
++                        if (strlen(cdhashString) != (sizeof(cdhash_t) * 2)) {
++                                printf("ERROR: passed cdhash has wrong length\n");
++                                return 2;
++                        }
++                        cdhash_t cdhash;
++                        if (convert_hex_string_to_data(cdhashString, &cdhash)) {
++                                printf("ERROR: passed cdhash is malformed\n");
++                                return 2;
++                        }
++                        return jbclient_root_trustcache_add_cdhash(cdhash, sizeof(cdhash));
++                }
++        }
++        else if (!strcmp(cmd, "reboot_userspace")) {
++                return reboot3(RB2_USERREBOOT);
++        }
++        else if (!strcmp(cmd, "respring")) {
++                const char *sbreloadPath = JBROOT_PATH("/usr/bin/sbreload");
++                if (execve(sbreloadPath, (char *[]){ (char *)sbreloadPath, NULL }, environ) != 0) {
++                        killall("/usr/libexec/backboardd", SIGTERM);
++                }
++        }
++        else if (!strcmp(cmd, "rebuild_icon_cache")) {
++                BOOL suc = [[LSApplicationWorkspace defaultWorkspace] _LSPrivateRebuildApplicationDatabasesForSystemApps:YES internal:YES user:YES];
++                return suc ? 0 : -1;
++        }
++        else if (!strcmp(cmd, "update")) {
++                if (argc < 4) {
++                        print_usage();
++                        return 2;
++                }
++                char *updateType = argv[2];
++                char *updateFile = argv[3];
++                if (access(updateFile, F_OK) != 0) {
++                        printf("ERROR: File %s does not exist\n", updateFile);
++                        return 3;
++                }
++
++                if (!strcmp(updateType, "tipa")) {
++                        setsid();
++
++                        LSApplicationProxy *trollstoreAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"com.opa334.TrollStore"];
++                        if (!trollstoreAppProxy || !trollstoreAppProxy.installed) {
++                                printf("Unable to locate TrollStore, doesn't seem like it's installed.\n");
++                                return 4;
++                        }
++                        NSString *trollstorehelperPath = [trollstoreAppProxy.bundleURL.path stringByAppendingPathComponent:@"trollstorehelper"];
++                        int r = exec_cmd(trollstorehelperPath.fileSystemRepresentation, "install", "skip-uicache", "force", updateFile, NULL);
++                        if (r != 0) {
++                                printf("Failed to install tipa via TrollStore: %d\n", r);
++                                return 5;
++                        }
++
++                        LSApplicationProxy *euphoriaAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"dev.euphoria.Euphoria"];
++                        if (!euphoriaAppProxy) {
++                                printf("Unable to locate newly installed Euphoria build.\n");
++                                return 6;
++                        }
++                        updateFile = strdup([euphoriaAppProxy.bundleURL.path stringByAppendingPathComponent:@"basebin.tar"].fileSystemRepresentation);
++                        // Fall through to basebin installation
++                }
++                else if (!strcmp(updateType, "tarball")) {
++                        NSString *tmpPath = [@"/tmp" stringByAppendingPathComponent:[NSUUID UUID].UUIDString];
++                        [[NSFileManager defaultManager] createDirectoryAtPath:tmpPath withIntermediateDirectories:NO attributes:nil error:nil];
++                        int r = libarchive_unarchive(updateFile, tmpPath.fileSystemRepresentation);
++                        if (r != 0) {
++                                printf("Failed to extract tarball: %d\n", r);
++                                return 7;
++                        }
++                        updateFile = strdup([tmpPath stringByAppendingPathComponent:@"basebin.tar"].fileSystemRepresentation);
++                        // Fall through to basebin installation
++                }
++                else if (strcmp(updateType, "basebin") != 0) {
++                        // If type is not tipa, tarball or basebin, bail out
++                        print_usage();
++                        return 2;
++                }
++
++                int64_t result = jbclient_platform_stage_jailbreak_update(updateFile);
++                if (result == 0) {
++                        printf("Staged update for installation during the next userspace reboot, userspace rebooting now...\n");
++                        usleep(10000);
++                        return reboot3(RB2_USERREBOOT);
++                }
++                else {
++                        printf("Staging update failed with error code %lld\n", result);
++                        return result;
++                }
++        }
++        else if (!strcmp(cmd, "internal")) {
++                if (getuid() != 0) return 41;
++                if (argc < 3) return 42;
++
++                const char *internalCmd = argv[2];
++                return jbctl_handle_internal(internalCmd, argc-2, &argv[2]);
++        }
++
++                else if (!strcmp(cmd, "rootful")) {
++                        if (getuid() != 0) {
++                                printf("Error: rootful requires root\n");
++                                return 41;
++                        }
++                        if (argc < 3) {
++                                printf("Usage: jbctl rootful <status|enable|disable>\n");
++                                return 1;
++                        }
++                        const char *rootfulCmd = argv[2];
++                        if (!strcmp(rootfulCmd, "status")) {
++                                rootful_status_t status = { 0 };
++                                int r = rootful_get_status(&status);
++                                if (r != 0) {
++                                        printf("Error: rootful_get_status failed (%s)\n", strerror(r));
++                                        return r;
++                                }
++                                printf("Rootful mode:\n");
++                                printf("  Root filesystem remounted read-write: %s\n", status.rootMountedRW ? "yes" : "no");
++                                printf("  Overlay mounts active:               %s\n", status.overlayActive ? "yes" : "no");
++                                printf("  Configuration supported:             %s\n", rootful_supported_configuration() ? "yes" : "no");
++                                printf("  Last error:                          %s\n", status.lastError[0] ? status.lastError : "none");
++                                return 0;
++                        }
++                        else if (!strcmp(rootfulCmd, "enable")) {
++                                rootful_status_t status = { 0 };
++                                int r = rootful_enable(true, &status);
++                                if (r != 0) {
++                                        printf("Error: rootful_enable failed (%s)\n", strerror(r));
++                                        return r;
++                                }
++                                printf("Rootful mode enabled (root RW: %s, overlays: %s)\n",
++                                        status.rootMountedRW ? "yes" : "no",
++                                        status.overlayActive ? "yes" : "no");
++                                return 0;
++                        }
++                        else if (!strcmp(rootfulCmd, "disable")) {
++                                int r = rootful_disable();
++                                if (r != 0) {
++                                        printf("Error: rootful_disable failed (%s)\n", strerror(r));
++                                        return r;
++                                }
++                                printf("Rootful mode disabled\n");
++                                return 0;
++                        }
++                        printf("Usage: jbctl rootful <status|enable|disable>\n");
++                        return 1;
++                }
++                else if (!strcmp(cmd, "cloak")) {
++                        if (getuid() != 0) {
++                                printf("Error: cloak requires root\n");
++                                return 41;
++                        }
++                        if (argc < 3) {
++                                printf("Usage: jbctl cloak <status|enable|disable|set> [options]\n");
++                                return 1;
++                        }
++                        const char *cloakCmd = argv[2];
++                        if (!strcmp(cloakCmd, "status")) {
++                                cloak_policy_t policy = { 0 };
++                                if (cloak_get_policy(&policy) != 0) {
++                                        printf("Error: unable to query cloak policy\n");
++                                        return 1;
++                                }
++                                cloak_mount_status_t mnt = { 0 };
++                                cloak_get_mount_status(&mnt);
++                                printf("Cloak (stealth) mode:\n");
++                                printf("  Enabled:          %s\n", policy.enabled ? "yes" : "no");
++                                printf("  Hide mounts:      %s\n", policy.hideMounts ? "yes" : "no");
++                                printf("  Hide credentials: %s\n", policy.hideCredentials ? "yes" : "no");
++                                printf("  Hide trustcache:  %s\n", policy.hideTrustcache ? "yes" : "no");
++                                printf("  Stealth level:    %llu\n", (unsigned long long)policy.stealthLevel);
++                                printf("  Cover mount:      %s\n", mnt.active ? mnt.mountPoint : "not mounted");
++                                if (mnt.error[0]) printf("  Last error:       %s\n", mnt.error);
++                                return 0;
++                        }
++                        else if (!strcmp(cloakCmd, "enable")) {
++                                int r = cloak_enable();
++                                if (r != 0) {
++                                        printf("Error: cloak_enable failed\n");
++                                        return r;
++                                }
++                                printf("Cloak enabled (cloakd will bring up the cover mount)\n");
++                                return 0;
++                        }
++                        else if (!strcmp(cloakCmd, "disable")) {
++                                int r = cloak_disable();
++                                if (r != 0) {
++                                        printf("Error: cloak_disable failed\n");
++                                        return r;
++                                }
++                                printf("Cloak disabled\n");
++                                return 0;
++                        }
++                        else if (!strcmp(cloakCmd, "set")) {
++                                // jbctl cloak set hideMounts=1 hideCredentials=1 hideTrustcache=1 stealthLevel=2
++                                cloak_policy_t policy = { 0 };
++                                if (cloak_get_policy(&policy) != 0) {
++                                        printf("Error: unable to query cloak policy\n");
++                                        return 1;
++                                }
++                                for (int i = 3; i < argc; i++) {
++                                        char *arg = argv[i];
++                                        char *eq = strchr(arg, '=');
++                                        if (!eq) continue;
++                                        *eq = '\0';
++                                        const char *key = arg;
++                                        const char *value = eq + 1;
++                                        if (!strcmp(key, "hideMounts")) policy.hideMounts = atoi(value);
++                                        else if (!strcmp(key, "hideCredentials")) policy.hideCredentials = atoi(value);
++                                        else if (!strcmp(key, "hideTrustcache")) policy.hideTrustcache = atoi(value);
++                                        else if (!strcmp(key, "stealthLevel")) policy.stealthLevel = strtoull(value, NULL, 10);
++                                        // Flip #5 (2026-10-11): the key name stays
++                                        // (transport compat), the meaning inverted with
++                                        // the deny-by-default flip. blacklistMode=<0|1>:
++                                        // 0 (default) = whitelist mode — on the aegis
++                                        // list = trusted (plain view), everyone else is
++                                        // filtered. 1 = legacy blacklist mode (opt-out).
++                                        else if (!strcmp(key, "blacklistMode")) policy.blacklistMode = (strtoull(value, NULL, 10) != 0);
++                                }
++                                int r = cloak_set_options(&policy);
++                                if (r != 0) {
++                                        printf("Error: cloak_set_options failed\n");
++                                        return r;
++                                }
++                                printf("Cloak options updated\n");
++                                return 0;
++                        }
++                        printf("Usage: jbctl cloak <status|enable|disable|set> [options]\n");
++                        return 1;
++                }
++
++        else if (!strcmp(cmd, "aegis")) {
++                if (getuid() != 0) {
++                        printf("Error: aegis requires root\n");
++                        return 41;
++                }
++                if (argc < 3) {
++                        printf("Usage: jbctl aegis <status|enable|disable|set-level|add|remove|list|clear> [args]\n");
++                        return 1;
++                }
++                const char *aegisCmd = argv[2];
++                if (!strcmp(aegisCmd, "status")) {
++                        aegis_policy_t policy = { 0 };
++                        if (aegis_get_policy(&policy) != 0) {
++                                printf("Error: unable to query aegis policy\n");
++                                return 1;
++                        }
++                        printf("Aegis (per-app shielding):\n");
++                        printf("  Enabled:        %s\n", policy.enabled ? "yes" : "no");
++                        printf("  Default level:  %llu\n", (unsigned long long)policy.defaultLevel);
++                        printf("  Shielded apps:  %u\n", policy.appCount);
++                        for (uint32_t i = 0; i < policy.appCount && i < AEGIS_MAX_APPS; i++) {
++                                printf("    %s (level %llu)\n", policy.appBundleIds[i], (unsigned long long)policy.appLevels[i]);
++                        }
++                        return 0;
++                }
++                else if (!strcmp(aegisCmd, "enable")) {
++                        int r = aegis_enable();
++                        if (r != 0) { printf("Error: aegis_enable failed\n"); return r; }
++                        printf("Aegis enabled (aegisd will bring up the cover mount)\n");
++                        return 0;
++                }
++                else if (!strcmp(aegisCmd, "disable")) {
++                        int r = aegis_disable();
++                        if (r != 0) { printf("Error: aegis_disable failed\n"); return r; }
++                        printf("Aegis disabled\n");
++                        return 0;
++                }
++                else if (!strcmp(aegisCmd, "set-level")) {
++                        if (argc < 4) { printf("Usage: jbctl aegis set-level <0=off|1=lite|2=full|3=paranoid>\n"); return 1; }
++                        uint64_t level = strtoull(argv[3], NULL, 10);
++                        int r = aegis_set_default_level(level);
++                        if (r != 0) { printf("Error: aegis_set_default_level failed\n"); return r; }
++                        printf("Aegis default level set to %llu\n", (unsigned long long)level);
++                        return 0;
++                }
++                else if (!strcmp(aegisCmd, "add")) {
++                        if (argc < 4) { printf("Usage: jbctl aegis add <bundleId> [level]\n"); return 1; }
++                        const char *bid = argv[3];
++                        uint64_t level = (argc >= 5) ? strtoull(argv[4], NULL, 10) : AEGIS_LEVEL_FULL;
++                        int r = aegis_add_app(bid, level);
++                        if (r != 0) { printf("Error: aegis_add_app failed\n"); return r; }
++                        printf("Aegis: added %s at level %llu\n", bid, (unsigned long long)level);
++                        return 0;
++                }
++                else if (!strcmp(aegisCmd, "remove")) {
++                        if (argc < 4) { printf("Usage: jbctl aegis remove <bundleId>\n"); return 1; }
++                        int r = aegis_remove_app(argv[3]);
++                        if (r != 0) { printf("Error: aegis_remove_app failed\n"); return r; }
++                        printf("Aegis: removed %s\n", argv[3]);
++                        return 0;
++                }
++                else if (!strcmp(aegisCmd, "clear")) {
++                        int r = aegis_clear_apps();
++                        if (r != 0) { printf("Error: aegis_clear_apps failed\n"); return r; }
++                        printf("Aegis: app list cleared\n");
++                        return 0;
++                }
++                else if (!strcmp(aegisCmd, "list")) {
++                        aegis_policy_t policy = { 0 };
++                        if (aegis_get_policy(&policy) != 0) {
++                                printf("Error: unable to query aegis policy\n");
++                                return 1;
++                        }
++                        if (policy.appCount == 0) {
++                                printf("No apps in aegis shield list\n");
++                        }
++                        else {
++                                for (uint32_t i = 0; i < policy.appCount && i < AEGIS_MAX_APPS; i++) {
++                                        printf("%s\t%llu\n", policy.appBundleIds[i], (unsigned long long)policy.appLevels[i]);
++                                }
++                        }
++                        return 0;
++                }
++                printf("Usage: jbctl aegis <status|enable|disable|set-level|add|remove|list|clear> [args]\n");
++                return 1;
++        }
+ 
+-	return 0;
++        return 0;
+ }
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/launchdhook/src/jbserver/jbdomain_aegis.c euphoria-v1007-src/BaseBin/launchdhook/src/jbserver/jbdomain_aegis.c
+--- euphoria-v1007-pristine/BaseBin/launchdhook/src/jbserver/jbdomain_aegis.c	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/launchdhook/src/jbserver/jbdomain_aegis.c	2026-10-11 11:47:37.531482763 +0800
+@@ -33,202 +33,219 @@
+ 
+ static bool aegis_caller_is_platform(audit_token_t *callerToken)
+ {
+-	if (!callerToken) return false;
+-	pid_t pid = audit_token_to_pid(*callerToken);
+-	uint32_t csflags = 0;
+-	if (csops_audittoken(pid, CS_OPS_STATUS, &csflags, sizeof(csflags), callerToken) != 0) return false;
+-	return (csflags & CS_PLATFORM_BINARY);
++        if (!callerToken) return false;
++        pid_t pid = audit_token_to_pid(*callerToken);
++        uint32_t csflags = 0;
++        if (csops_audittoken(pid, CS_OPS_STATUS, &csflags, sizeof(csflags), callerToken) != 0) return false;
++        return (csflags & CS_PLATFORM_BINARY);
+ }
+ 
+ static int aegis_server_get_policy(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+ {
+-	/* out args: policy(dict), mountActive(bool), mountPoint(string), error(string) */
+-	if (a1) *(xpc_object_t *)a1 = aegis_policy_serialize(&gAegisPolicy);
+-	if (a2) *(bool *)a2 = gAegisMountActive;
+-	if (a3) *(char **)a3 = strdup(gAegisMountPoint[0] ? gAegisMountPoint : "");
+-	if (a4) *(char **)a4 = strdup(gAegisLastError[0] ? gAegisLastError : "");
+-	return 0;
++        /* out args: policy(dict), mountActive(bool), mountPoint(string), error(string) */
++        if (a1) *(xpc_object_t *)a1 = aegis_policy_serialize(&gAegisPolicy);
++        if (a2) *(bool *)a2 = gAegisMountActive;
++        if (a3) *(char **)a3 = strdup(gAegisMountPoint[0] ? gAegisMountPoint : "");
++        if (a4) *(char **)a4 = strdup(gAegisLastError[0] ? gAegisLastError : "");
++        return 0;
+ }
+ 
+ static int aegis_server_enable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+ {
+-	audit_token_t *callerToken = (audit_token_t *)a1;
+-	if (!aegis_caller_is_platform(callerToken)) return -2;
+-	gAegisPolicy.enabled = true;
+-	return 0;
++        audit_token_t *callerToken = (audit_token_t *)a1;
++        if (!aegis_caller_is_platform(callerToken)) return -2;
++        gAegisPolicy.enabled = true;
++        /* P0-2 fix (2026-10-11): bridge the runtime flag into the persisted
++         * jailbreak settings, mirroring what cloak_server_enable has always
++         * done for cloakEnabled. Before this, the aegis master switch lived
++         * only in launchdhook's memory: every launchd reload / userspace
++         * reboot reset it to false while aegisd kept running — the "shield
++         * silently off after reboot" bug. The key now also flows through the
++         * same gSystemInfo channel the cloak keys use. */
++        gSystemInfo.jailbreakSettings.aegisEnabled = true;
++        return 0;
+ }
+ 
+ static int aegis_server_disable(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+ {
+-	audit_token_t *callerToken = (audit_token_t *)a1;
+-	if (!aegis_caller_is_platform(callerToken)) return -2;
+-	gAegisPolicy.enabled = false;
+-	return 0;
++        audit_token_t *callerToken = (audit_token_t *)a1;
++        if (!aegis_caller_is_platform(callerToken)) return -2;
++        gAegisPolicy.enabled = false;
++        /* P0-2: keep the persisted side in sync (see aegis_server_enable). */
++        gSystemInfo.jailbreakSettings.aegisEnabled = false;
++        return 0;
+ }
+ 
+ static int aegis_server_set_default_level(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+ {
+-	audit_token_t *callerToken = (audit_token_t *)a1;
+-	if (!aegis_caller_is_platform(callerToken)) return -2;
+-	if (!a2) return -1;
+-	uint64_t level = *(uint64_t *)a2;
+-	if (level > AEGIS_LEVEL_PARANOID) return -1;
+-	gAegisPolicy.defaultLevel = level;
+-	return 0;
++        audit_token_t *callerToken = (audit_token_t *)a1;
++        if (!aegis_caller_is_platform(callerToken)) return -2;
++        if (!a2) return -1;
++        uint64_t level = *(uint64_t *)a2;
++        if (level > AEGIS_LEVEL_PARANOID) return -1;
++        gAegisPolicy.defaultLevel = level;
++        /* P0-2: persist (see aegis_server_enable). Note the deny-by-default
++         * flip: level 0 now reads as "FULL" for unlisted apps on the
++         * systemhook side, so 0 remains the natural default value. */
++        gSystemInfo.jailbreakSettings.aegisDefaultLevel = level;
++        return 0;
+ }
+ 
+ static int aegis_server_add_app(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+ {
+-	audit_token_t *callerToken = (audit_token_t *)a1;
+-	if (!aegis_caller_is_platform(callerToken)) return -2;
+-	const char *bundleId = (const char *)a2;
+-	if (!bundleId || !bundleId[0]) return -1;
+-	uint64_t level = a3 ? *(uint64_t *)a3 : AEGIS_LEVEL_FULL;
+-
+-	/* Update existing entry in place if present */
+-	for (uint32_t i = 0; i < gAegisPolicy.appCount; i++) {
+-		if (strncmp(gAegisPolicy.appBundleIds[i], bundleId, AEGIS_BUNDLE_ID_MAX) == 0) {
+-			gAegisPolicy.appLevels[i] = level;
+-			return 0;
+-		}
+-	}
+-	if (gAegisPolicy.appCount >= AEGIS_MAX_APPS) return -1;
+-	strlcpy(gAegisPolicy.appBundleIds[gAegisPolicy.appCount], bundleId, AEGIS_BUNDLE_ID_MAX);
+-	gAegisPolicy.appLevels[gAegisPolicy.appCount] = level;
+-	gAegisPolicy.appCount++;
+-	return 0;
++        audit_token_t *callerToken = (audit_token_t *)a1;
++        if (!aegis_caller_is_platform(callerToken)) return -2;
++        const char *bundleId = (const char *)a2;
++        if (!bundleId || !bundleId[0]) return -1;
++        /* Deny-by-default flip: the list is a TRUST whitelist now — adding
++         * an entry without an explicit level grants TRUST (level 0 = OFF =
++         * plain view), the inverse of the old "add = shield it" default. */
++        uint64_t level = a3 ? *(uint64_t *)a3 : AEGIS_LEVEL_OFF;
++
++        /* Update existing entry in place if present */
++        for (uint32_t i = 0; i < gAegisPolicy.appCount; i++) {
++                if (strncmp(gAegisPolicy.appBundleIds[i], bundleId, AEGIS_BUNDLE_ID_MAX) == 0) {
++                        gAegisPolicy.appLevels[i] = level;
++                        return 0;
++                }
++        }
++        if (gAegisPolicy.appCount >= AEGIS_MAX_APPS) return -1;
++        strlcpy(gAegisPolicy.appBundleIds[gAegisPolicy.appCount], bundleId, AEGIS_BUNDLE_ID_MAX);
++        gAegisPolicy.appLevels[gAegisPolicy.appCount] = level;
++        gAegisPolicy.appCount++;
++        return 0;
+ }
+ 
+ static int aegis_server_remove_app(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+ {
+-	audit_token_t *callerToken = (audit_token_t *)a1;
+-	if (!aegis_caller_is_platform(callerToken)) return -2;
+-	const char *bundleId = (const char *)a2;
+-	if (!bundleId) return -1;
+-
+-	for (uint32_t i = 0; i < gAegisPolicy.appCount; i++) {
+-		if (strncmp(gAegisPolicy.appBundleIds[i], bundleId, AEGIS_BUNDLE_ID_MAX) == 0) {
+-			/* shift down */
+-			for (uint32_t j = i; j + 1 < gAegisPolicy.appCount; j++) {
+-				strlcpy(gAegisPolicy.appBundleIds[j], gAegisPolicy.appBundleIds[j+1], AEGIS_BUNDLE_ID_MAX);
+-				gAegisPolicy.appLevels[j] = gAegisPolicy.appLevels[j+1];
+-			}
+-			gAegisPolicy.appCount--;
+-			memset(gAegisPolicy.appBundleIds[gAegisPolicy.appCount], 0, AEGIS_BUNDLE_ID_MAX);
+-			gAegisPolicy.appLevels[gAegisPolicy.appCount] = 0;
+-			return 0;
+-		}
+-	}
+-	return 0; /* not found is not an error */
++        audit_token_t *callerToken = (audit_token_t *)a1;
++        if (!aegis_caller_is_platform(callerToken)) return -2;
++        const char *bundleId = (const char *)a2;
++        if (!bundleId) return -1;
++
++        for (uint32_t i = 0; i < gAegisPolicy.appCount; i++) {
++                if (strncmp(gAegisPolicy.appBundleIds[i], bundleId, AEGIS_BUNDLE_ID_MAX) == 0) {
++                        /* shift down */
++                        for (uint32_t j = i; j + 1 < gAegisPolicy.appCount; j++) {
++                                strlcpy(gAegisPolicy.appBundleIds[j], gAegisPolicy.appBundleIds[j+1], AEGIS_BUNDLE_ID_MAX);
++                                gAegisPolicy.appLevels[j] = gAegisPolicy.appLevels[j+1];
++                        }
++                        gAegisPolicy.appCount--;
++                        memset(gAegisPolicy.appBundleIds[gAegisPolicy.appCount], 0, AEGIS_BUNDLE_ID_MAX);
++                        gAegisPolicy.appLevels[gAegisPolicy.appCount] = 0;
++                        return 0;
++                }
++        }
++        return 0; /* not found is not an error */
+ }
+ 
+ static int aegis_server_clear_apps(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+ {
+-	audit_token_t *callerToken = (audit_token_t *)a1;
+-	if (!aegis_caller_is_platform(callerToken)) return -2;
+-	gAegisPolicy.appCount = 0;
+-	memset(gAegisPolicy.appBundleIds, 0, sizeof(gAegisPolicy.appBundleIds));
+-	memset(gAegisPolicy.appLevels, 0, sizeof(gAegisPolicy.appLevels));
+-	return 0;
++        audit_token_t *callerToken = (audit_token_t *)a1;
++        if (!aegis_caller_is_platform(callerToken)) return -2;
++        gAegisPolicy.appCount = 0;
++        memset(gAegisPolicy.appBundleIds, 0, sizeof(gAegisPolicy.appBundleIds));
++        memset(gAegisPolicy.appLevels, 0, sizeof(gAegisPolicy.appLevels));
++        return 0;
+ }
+ 
+ static int aegis_server_mount_report(void *a1, void *a2, void *a3, void *a4, void *a5, void *a6, void *a7, void *a8)
+ {
+-	audit_token_t *callerToken = (audit_token_t *)a1;
+-	if (!aegis_caller_is_platform(callerToken)) return -2;
+-	const char *mountPoint = (const char *)a2;
+-	const char *error = (const char *)a3;
+-
+-	if (mountPoint && mountPoint[0]) {
+-		strlcpy(gAegisMountPoint, mountPoint, sizeof(gAegisMountPoint));
+-		gAegisMountActive = true;
+-	}
+-	else {
+-		gAegisMountPoint[0] = '\0';
+-		gAegisMountActive = false;
+-	}
+-	if (error) strlcpy(gAegisLastError, error, sizeof(gAegisLastError));
+-	else      gAegisLastError[0] = '\0';
+-	return 0;
++        audit_token_t *callerToken = (audit_token_t *)a1;
++        if (!aegis_caller_is_platform(callerToken)) return -2;
++        const char *mountPoint = (const char *)a2;
++        const char *error = (const char *)a3;
++
++        if (mountPoint && mountPoint[0]) {
++                strlcpy(gAegisMountPoint, mountPoint, sizeof(gAegisMountPoint));
++                gAegisMountActive = true;
++        }
++        else {
++                gAegisMountPoint[0] = '\0';
++                gAegisMountActive = false;
++        }
++        if (error) strlcpy(gAegisLastError, error, sizeof(gAegisLastError));
++        else      gAegisLastError[0] = '\0';
++        return 0;
+ }
+ 
+ struct jbserver_domain gAegisDomain = {
+-	.permissionHandler = NULL, // GET_POLICY systemwide; mutations check per-action
+-	// 构建修复：actions 是柔性数组成员，不能用复合字面量初始化，改花括号
+-	.actions = {
+-		// JBS_AEGIS_GET_POLICY
+-		{
+-			.handler = aegis_server_get_policy,
+-			.args = (jbserver_arg[]){
+-				{ .name = "policy",     .type = JBS_TYPE_DICTIONARY, .out = true },
+-				{ .name = "mountActive", .type = JBS_TYPE_BOOL,      .out = true },
+-				{ .name = "mountPoint",  .type = JBS_TYPE_STRING,     .out = true },
+-				{ .name = "error",       .type = JBS_TYPE_STRING,     .out = true },
+-				{ 0 },
+-			},
+-		},
+-		// JBS_AEGIS_ENABLE
+-		{
+-			.handler = aegis_server_enable,
+-			.args = (jbserver_arg[]){
+-				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
+-				{ 0 },
+-			},
+-		},
+-		// JBS_AEGIS_DISABLE
+-		{
+-			.handler = aegis_server_disable,
+-			.args = (jbserver_arg[]){
+-				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
+-				{ 0 },
+-			},
+-		},
+-		// JBS_AEGIS_SET_DEFAULT_LEVEL
+-		{
+-			.handler = aegis_server_set_default_level,
+-			.args = (jbserver_arg[]){
+-				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
+-				{ .name = "level",        .type = JBS_TYPE_UINT64,        .out = false },
+-				{ 0 },
+-			},
+-		},
+-		// JBS_AEGIS_ADD_APP
+-		{
+-			.handler = aegis_server_add_app,
+-			.args = (jbserver_arg[]){
+-				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
+-				{ .name = "bundleId",     .type = JBS_TYPE_STRING,       .out = false },
+-				{ .name = "level",        .type = JBS_TYPE_UINT64,       .out = false },
+-				{ 0 },
+-			},
+-		},
+-		// JBS_AEGIS_REMOVE_APP
+-		{
+-			.handler = aegis_server_remove_app,
+-			.args = (jbserver_arg[]){
+-				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
+-				{ .name = "bundleId",     .type = JBS_TYPE_STRING,       .out = false },
+-				{ 0 },
+-			},
+-		},
+-		// JBS_AEGIS_CLEAR_APPS
+-		{
+-			.handler = aegis_server_clear_apps,
+-			.args = (jbserver_arg[]){
+-				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
+-				{ 0 },
+-			},
+-		},
+-		// JBS_AEGIS_MOUNT_REPORT
+-		{
+-			.handler = aegis_server_mount_report,
+-			.args = (jbserver_arg[]){
+-				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
+-				{ .name = "mountPoint",   .type = JBS_TYPE_STRING,       .out = false },
+-				{ .name = "error",        .type = JBS_TYPE_STRING,       .out = false },
+-				{ 0 },
+-			},
+-		},
+-		{ 0 },
+-	},
++        .permissionHandler = NULL, // GET_POLICY systemwide; mutations check per-action
++        // 构建修复：actions 是柔性数组成员，不能用复合字面量初始化，改花括号
++        .actions = {
++                // JBS_AEGIS_GET_POLICY
++                {
++                        .handler = aegis_server_get_policy,
++                        .args = (jbserver_arg[]){
++                                { .name = "policy",     .type = JBS_TYPE_DICTIONARY, .out = true },
++                                { .name = "mountActive", .type = JBS_TYPE_BOOL,      .out = true },
++                                { .name = "mountPoint",  .type = JBS_TYPE_STRING,     .out = true },
++                                { .name = "error",       .type = JBS_TYPE_STRING,     .out = true },
++                                { 0 },
++                        },
++                },
++                // JBS_AEGIS_ENABLE
++                {
++                        .handler = aegis_server_enable,
++                        .args = (jbserver_arg[]){
++                                { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
++                                { 0 },
++                        },
++                },
++                // JBS_AEGIS_DISABLE
++                {
++                        .handler = aegis_server_disable,
++                        .args = (jbserver_arg[]){
++                                { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
++                                { 0 },
++                        },
++                },
++                // JBS_AEGIS_SET_DEFAULT_LEVEL
++                {
++                        .handler = aegis_server_set_default_level,
++                        .args = (jbserver_arg[]){
++                                { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
++                                { .name = "level",        .type = JBS_TYPE_UINT64,        .out = false },
++                                { 0 },
++                        },
++                },
++                // JBS_AEGIS_ADD_APP
++                {
++                        .handler = aegis_server_add_app,
++                        .args = (jbserver_arg[]){
++                                { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
++                                { .name = "bundleId",     .type = JBS_TYPE_STRING,       .out = false },
++                                { .name = "level",        .type = JBS_TYPE_UINT64,       .out = false },
++                                { 0 },
++                        },
++                },
++                // JBS_AEGIS_REMOVE_APP
++                {
++                        .handler = aegis_server_remove_app,
++                        .args = (jbserver_arg[]){
++                                { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
++                                { .name = "bundleId",     .type = JBS_TYPE_STRING,       .out = false },
++                                { 0 },
++                        },
++                },
++                // JBS_AEGIS_CLEAR_APPS
++                {
++                        .handler = aegis_server_clear_apps,
++                        .args = (jbserver_arg[]){
++                                { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
++                                { 0 },
++                        },
++                },
++                // JBS_AEGIS_MOUNT_REPORT
++                {
++                        .handler = aegis_server_mount_report,
++                        .args = (jbserver_arg[]){
++                                { .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
++                                { .name = "mountPoint",   .type = JBS_TYPE_STRING,       .out = false },
++                                { .name = "error",        .type = JBS_TYPE_STRING,       .out = false },
++                                { 0 },
++                        },
++                },
++                { 0 },
++        },
+ };
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/launchdhook/src/jbserver/jbdomain_cloak.c euphoria-v1007-src/BaseBin/launchdhook/src/jbserver/jbdomain_cloak.c
+--- euphoria-v1007-pristine/BaseBin/launchdhook/src/jbserver/jbdomain_cloak.c	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/launchdhook/src/jbserver/jbdomain_cloak.c	2026-10-11 11:48:12.795587904 +0800
+@@ -80,7 +80,13 @@
+         if (a3) gSystemInfo.jailbreakSettings.cloakHideCredentials = *(bool *)a3;
+         if (a4) gSystemInfo.jailbreakSettings.cloakHideTrustcache  = *(bool *)a4;
+         if (a5) gSystemInfo.jailbreakSettings.cloakStealthLevel    = *(uint64_t *)a5;
+-        if (a6) gSystemInfo.jailbreakSettings.cloakBlacklistMode   = *(bool *)a6; // R40
++        if (a6) gSystemInfo.jailbreakSettings.cloakBlacklistMode   = *(bool *)a6;
++        // Flip #4 (2026-10-11): the storage slot stays (transport compat),
++        // but the SEMANTICS inverted with the deny-by-default flip: false
++        // (the value the daemon now replays at every jailbreak) = whitelist
++        // mode = "on the list means trusted, everyone else is filtered".
++        // The old R40 blacklist reading survives only as the opt-out marker
++        // path. See cloak_interpose.c Flip #2 for the consumer side.
+         return 0;
+ }
+ 
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/launchdhook/src/jbserver/jbsettings.c euphoria-v1007-src/BaseBin/launchdhook/src/jbserver/jbsettings.c
+--- euphoria-v1007-pristine/BaseBin/launchdhook/src/jbserver/jbsettings.c	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/launchdhook/src/jbserver/jbsettings.c	2026-10-11 11:47:18.937900060 +0800
+@@ -4,136 +4,129 @@
+ 
+ int jbsettings_get(const char *key, xpc_object_t *valueOut)
+ {
+-	if (!key)	return -1;
++        if (!key)       return -1;
+ 
+-	if (!strcmp(key, "markAppsAsDebugged")) {
+-		*valueOut = xpc_bool_create(jbsetting(markAppsAsDebugged));
+-		return 0;
+-	}
+-	else if (!strcmp(key, "jetsamMultiplier")) {
+-		*valueOut = xpc_double_create(jbsetting(jetsamMultiplier));
+-		return 0;
+-	}
+-	// Euphoria cloak (stealth) settings
+-	else if (!strcmp(key, "cloakEnabled")) {
+-		*valueOut = xpc_bool_create(jbsetting(cloakEnabled));
+-		return 0;
+-	}
+-	else if (!strcmp(key, "cloakHideMounts")) {
+-		*valueOut = xpc_bool_create(jbsetting(cloakHideMounts));
+-		return 0;
+-	}
+-	else if (!strcmp(key, "cloakHideCredentials")) {
+-		*valueOut = xpc_bool_create(jbsetting(cloakHideCredentials));
+-		return 0;
+-	}
+-	else if (!strcmp(key, "cloakHideTrustcache")) {
+-		*valueOut = xpc_bool_create(jbsetting(cloakHideTrustcache));
+-		return 0;
+-	}
+-	// R40: cloak blacklist mode (see info.h jailbreakSettings.cloakBlacklistMode)
+-	else if (!strcmp(key, "cloakBlacklistMode")) {
+-		*valueOut = xpc_bool_create(jbsetting(cloakBlacklistMode));
+-		return 0;
+-	}
+-	else if (!strcmp(key, "cloakStealthLevel")) {
+-		*valueOut = xpc_uint64_create(jbsetting(cloakStealthLevel));
+-		return 0;
+-	}
+-	// Euphoria aegis (per-app shielding) settings
+-	else if (!strcmp(key, "aegisEnabled")) {
+-		*valueOut = xpc_bool_create(jbsetting(aegisEnabled));
+-		return 0;
+-	}
+-	else if (!strcmp(key, "aegisDefaultLevel")) {
+-		*valueOut = xpc_uint64_create(jbsetting(aegisDefaultLevel));
+-		return 0;
+-	}
+-	// Euphoria rootful user toggle (App Settings UI)
+-	else if (!strcmp(key, "rootfulUserEnabled")) {
+-		*valueOut = xpc_bool_create(jbsetting(rootfulUserEnabled));
+-		return 0;
+-	}
+-	// R37: roothide independent user toggle (see info.h jailbreakSettings)
+-	else if (!strcmp(key, "roothideUserEnabled")) {
+-		*valueOut = xpc_bool_create(jbsetting(roothideUserEnabled));
+-		return 0;
+-	}
+-	// Read-only: whether this device sits inside the rootful matrix
+-	// (A12/A13 @ iOS 16.6.1-18.7.1). The App greys the toggle out when
+-	// this is false. Computed server-side; the set branch rejects it.
+-	else if (!strcmp(key, "rootfulSupported")) {
+-		*valueOut = xpc_bool_create(rootful_supported_configuration());
+-		return 0;
+-	}
+-	return -1;
++        if (!strcmp(key, "markAppsAsDebugged")) {
++                *valueOut = xpc_bool_create(jbsetting(markAppsAsDebugged));
++                return 0;
++        }
++        else if (!strcmp(key, "jetsamMultiplier")) {
++                *valueOut = xpc_double_create(jbsetting(jetsamMultiplier));
++                return 0;
++        }
++        // Euphoria cloak (stealth) settings
++        else if (!strcmp(key, "cloakEnabled")) {
++                *valueOut = xpc_bool_create(jbsetting(cloakEnabled));
++                return 0;
++        }
++        else if (!strcmp(key, "cloakHideMounts")) {
++                *valueOut = xpc_bool_create(jbsetting(cloakHideMounts));
++                return 0;
++        }
++        else if (!strcmp(key, "cloakHideCredentials")) {
++                *valueOut = xpc_bool_create(jbsetting(cloakHideCredentials));
++                return 0;
++        }
++        else if (!strcmp(key, "cloakHideTrustcache")) {
++                *valueOut = xpc_bool_create(jbsetting(cloakHideTrustcache));
++                return 0;
++        }
++        // R40: cloak blacklist mode (see info.h jailbreakSettings.cloakBlacklistMode)
++        else if (!strcmp(key, "cloakBlacklistMode")) {
++                *valueOut = xpc_bool_create(jbsetting(cloakBlacklistMode));
++                return 0;
++        }
++        else if (!strcmp(key, "cloakStealthLevel")) {
++                *valueOut = xpc_uint64_create(jbsetting(cloakStealthLevel));
++                return 0;
++        }
++        // Euphoria aegis (per-app shielding) settings
++        else if (!strcmp(key, "aegisEnabled")) {
++                *valueOut = xpc_bool_create(jbsetting(aegisEnabled));
++                return 0;
++        }
++        else if (!strcmp(key, "aegisDefaultLevel")) {
++                *valueOut = xpc_uint64_create(jbsetting(aegisDefaultLevel));
++                return 0;
++        }
++        // Euphoria rootful user toggle — FIXED-ROOTFUL BUILD (2026-10-11):
++        // the rootless/roothide modes were removed by design, so this key is
++        // pinned to true server-side. A third-party (or stale App) reading it
++        // must never observe false and walk a dead branch; the set branch
++        // below rejects writes for the same reason.
++        else if (!strcmp(key, "rootfulUserEnabled")) {
++                *valueOut = xpc_bool_create(true);
++                return 0;
++        }
++        // roothide toggle — pinned to true as well: hiding rides along with
++        // rootful unconditionally in this build (R4), the key survives only
++        // for transport compatibility with old clients.
++        else if (!strcmp(key, "roothideUserEnabled")) {
++                *valueOut = xpc_bool_create(true);
++                return 0;
++        }
++        // Read-only: whether this device sits inside the rootful matrix
++        // (A12/A13 @ iOS 16.6.1-18.7.1). The App greys the toggle out when
++        // this is false. Computed server-side; the set branch rejects it.
++        else if (!strcmp(key, "rootfulSupported")) {
++                *valueOut = xpc_bool_create(rootful_supported_configuration());
++                return 0;
++        }
++        return -1;
+ }
+ 
+ int jbsettings_set(const char *key, xpc_object_t value)
+ {
+-	if (!strcmp(key, "markAppsAsDebugged") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.markAppsAsDebugged = xpc_bool_get_value(value);
+-		return 0;
+-	}
+-	else if (!strcmp(key, "jetsamMultiplier") && xpc_get_type(value) == XPC_TYPE_DOUBLE) {
+-		gSystemInfo.jailbreakSettings.jetsamMultiplier = xpc_double_get_value(value);
+-		return 0;
+-	}
+-	// Euphoria cloak (stealth) settings
+-	else if (!strcmp(key, "cloakEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.cloakEnabled = xpc_bool_get_value(value);
+-		return 0;
+-	}
+-	else if (!strcmp(key, "cloakHideMounts") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.cloakHideMounts = xpc_bool_get_value(value);
+-		return 0;
+-	}
+-	else if (!strcmp(key, "cloakHideCredentials") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.cloakHideCredentials = xpc_bool_get_value(value);
+-		return 0;
+-	}
+-	else if (!strcmp(key, "cloakHideTrustcache") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.cloakHideTrustcache = xpc_bool_get_value(value);
+-		return 0;
+-	}
+-	// R40: cloak blacklist mode
+-	else if (!strcmp(key, "cloakBlacklistMode") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.cloakBlacklistMode = xpc_bool_get_value(value);
+-		return 0;
+-	}
+-	else if (!strcmp(key, "cloakStealthLevel") && xpc_get_type(value) == XPC_TYPE_UINT64) {
+-		gSystemInfo.jailbreakSettings.cloakStealthLevel = xpc_uint64_get_value(value);
+-		return 0;
+-	}
+-	// Euphoria aegis (per-app shielding) settings
+-	else if (!strcmp(key, "aegisEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.aegisEnabled = xpc_bool_get_value(value);
+-		return 0;
+-	}
+-	else if (!strcmp(key, "aegisDefaultLevel") && xpc_get_type(value) == XPC_TYPE_UINT64) {
+-		gSystemInfo.jailbreakSettings.aegisDefaultLevel = xpc_uint64_get_value(value);
+-		return 0;
+-	}
+-	// Euphoria rootful user toggle (App Settings UI)
+-	else if (!strcmp(key, "rootfulUserEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.rootfulUserEnabled = xpc_bool_get_value(value);
+-		// R37（用户 00:11 定案）：开 rootful 自动捆绑 roothide
+-		if (gSystemInfo.jailbreakSettings.rootfulUserEnabled) {
+-			gSystemInfo.jailbreakSettings.roothideUserEnabled = true;
+-		}
+-		// 关 roothide 时 rootful 锁死（服务端兜底，UI 联动之外的保底）
+-		if (!gSystemInfo.jailbreakSettings.roothideUserEnabled) {
+-			gSystemInfo.jailbreakSettings.rootfulUserEnabled = false;
+-		}
+-		return 0;
+-	}
+-	// R37: roothide independent toggle — turning it off force-disables rootful
+-	else if (!strcmp(key, "roothideUserEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+-		gSystemInfo.jailbreakSettings.roothideUserEnabled = xpc_bool_get_value(value);
+-		if (!gSystemInfo.jailbreakSettings.roothideUserEnabled) {
+-			gSystemInfo.jailbreakSettings.rootfulUserEnabled = false;
+-		}
+-		return 0;
+-	}
+-	return -1;
++        if (!strcmp(key, "markAppsAsDebugged") && xpc_get_type(value) == XPC_TYPE_BOOL) {
++                gSystemInfo.jailbreakSettings.markAppsAsDebugged = xpc_bool_get_value(value);
++                return 0;
++        }
++        else if (!strcmp(key, "jetsamMultiplier") && xpc_get_type(value) == XPC_TYPE_DOUBLE) {
++                gSystemInfo.jailbreakSettings.jetsamMultiplier = xpc_double_get_value(value);
++                return 0;
++        }
++        // Euphoria cloak (stealth) settings
++        else if (!strcmp(key, "cloakEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
++                gSystemInfo.jailbreakSettings.cloakEnabled = xpc_bool_get_value(value);
++                return 0;
++        }
++        else if (!strcmp(key, "cloakHideMounts") && xpc_get_type(value) == XPC_TYPE_BOOL) {
++                gSystemInfo.jailbreakSettings.cloakHideMounts = xpc_bool_get_value(value);
++                return 0;
++        }
++        else if (!strcmp(key, "cloakHideCredentials") && xpc_get_type(value) == XPC_TYPE_BOOL) {
++                gSystemInfo.jailbreakSettings.cloakHideCredentials = xpc_bool_get_value(value);
++                return 0;
++        }
++        else if (!strcmp(key, "cloakHideTrustcache") && xpc_get_type(value) == XPC_TYPE_BOOL) {
++                gSystemInfo.jailbreakSettings.cloakHideTrustcache = xpc_bool_get_value(value);
++                return 0;
++        }
++        // R40: cloak blacklist mode
++        else if (!strcmp(key, "cloakBlacklistMode") && xpc_get_type(value) == XPC_TYPE_BOOL) {
++                gSystemInfo.jailbreakSettings.cloakBlacklistMode = xpc_bool_get_value(value);
++                return 0;
++        }
++        else if (!strcmp(key, "cloakStealthLevel") && xpc_get_type(value) == XPC_TYPE_UINT64) {
++                gSystemInfo.jailbreakSettings.cloakStealthLevel = xpc_uint64_get_value(value);
++                return 0;
++        }
++        // Euphoria aegis (per-app shielding) settings
++        else if (!strcmp(key, "aegisEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
++                gSystemInfo.jailbreakSettings.aegisEnabled = xpc_bool_get_value(value);
++                return 0;
++        }
++        else if (!strcmp(key, "aegisDefaultLevel") && xpc_get_type(value) == XPC_TYPE_UINT64) {
++                gSystemInfo.jailbreakSettings.aegisDefaultLevel = xpc_uint64_get_value(value);
++                return 0;
++        }
++        // FIXED-ROOTFUL BUILD (2026-10-11): the mode keys are frozen. Writes
++        // are rejected — an external writer (stale App build, or a process
++        // that somehow reached this platform-only domain) must not be able
++        // to flip the jailbreak into a mode this build no longer contains.
++        // GET always answers true for both keys (see jbsettings_get).
++        else if (!strcmp(key, "rootfulUserEnabled") || !strcmp(key, "roothideUserEnabled")) {
++                return -1;
++        }
++        return -1;
+ }
+\ No newline at end of file
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/libjailbreak/src/aegis.c euphoria-v1007-src/BaseBin/libjailbreak/src/aegis.c
+--- euphoria-v1007-pristine/BaseBin/libjailbreak/src/aegis.c	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/libjailbreak/src/aegis.c	2026-10-11 11:44:43.693034856 +0800
+@@ -170,13 +170,23 @@
+                 /* Sileo / Zebra bootstrap markers */
+                 "/var/jb/.sileo_installed",
+                 "/var/jb/.zebra_installed",
+-                /* /basebin is the persistent basebin dir */
+-                "/private/preboot",       /* preboot where jbroot usually lives */
+         };
+         for (size_t i = 0; i < sizeof(jb_paths)/sizeof(jb_paths[0]); i++) {
+                 if (string_has_prefix(path, jb_paths[i])) return true;
+         }
+ 
++        /* P1-4 (DRF-3①, 2026-10-11): the whole-volume "/private/preboot" prefix
++         * was previously listed above. On a stock device every stat/access on
++         * /private/preboot succeeds (it is a real, always-present mount), so
++         * blanket-ENOENTing it is both a hard jailbreak fingerprint (B-line
++         * rule: "an error is itself a fingerprint") and a functional break
++         * (TrollStore apps and container data live there). With the
++         * deny-by-default flip every .app process runs at FULL shielding, so
++         * the blast radius of that overbroad prefix goes from "rare" to
++         * "every app, every preboot touch". Narrowed to the actual jbroot
++         * prefix instead. */
++        if (string_has_prefix(path, JBROOT_PATH(""))) return true;
++
+         /* Cydia Substrate legacy paths (rootful era) — still tell-tale */
+         static const char *legacy_paths[] = {
+                 "/Applications/Cydia.app",
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/libjailbreak/src/cloak.c euphoria-v1007-src/BaseBin/libjailbreak/src/cloak.c
+--- euphoria-v1007-pristine/BaseBin/libjailbreak/src/cloak.c	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/libjailbreak/src/cloak.c	2026-10-11 11:48:26.592020267 +0800
+@@ -6,110 +6,110 @@
+ 
+ xpc_object_t cloak_policy_serialize(const cloak_policy_t *policy)
+ {
+-	xpc_object_t xdict = xpc_dictionary_create_empty();
+-	xpc_dictionary_set_bool(xdict, "enabled", policy->enabled);
+-	xpc_dictionary_set_bool(xdict, "hideMounts", policy->hideMounts);
+-	xpc_dictionary_set_bool(xdict, "hideCredentials", policy->hideCredentials);
+-	xpc_dictionary_set_bool(xdict, "hideTrustcache", policy->hideTrustcache);
+-	xpc_dictionary_set_uint64(xdict, "stealthLevel", policy->stealthLevel);
+-	xpc_dictionary_set_bool(xdict, "blacklistMode", policy->blacklistMode); // R40
+-	return xdict;
++        xpc_object_t xdict = xpc_dictionary_create_empty();
++        xpc_dictionary_set_bool(xdict, "enabled", policy->enabled);
++        xpc_dictionary_set_bool(xdict, "hideMounts", policy->hideMounts);
++        xpc_dictionary_set_bool(xdict, "hideCredentials", policy->hideCredentials);
++        xpc_dictionary_set_bool(xdict, "hideTrustcache", policy->hideTrustcache);
++        xpc_dictionary_set_uint64(xdict, "stealthLevel", policy->stealthLevel);
++        xpc_dictionary_set_bool(xdict, "blacklistMode", policy->blacklistMode); // R40
++        return xdict;
+ }
+ 
+ void cloak_policy_deserialize(xpc_object_t xdict, cloak_policy_t *policy)
+ {
+-	if (!xdict || xpc_get_type(xdict) != XPC_TYPE_DICTIONARY) return;
+-	memset(policy, 0, sizeof(*policy));
+-	policy->enabled          = xpc_dictionary_get_bool(xdict, "enabled");
+-	policy->hideMounts       = xpc_dictionary_get_bool(xdict, "hideMounts");
+-	policy->hideCredentials  = xpc_dictionary_get_bool(xdict, "hideCredentials");
+-	policy->hideTrustcache   = xpc_dictionary_get_bool(xdict, "hideTrustcache");
+-	policy->stealthLevel     = xpc_dictionary_get_uint64(xdict, "stealthLevel");
+-	policy->blacklistMode    = xpc_dictionary_get_bool(xdict, "blacklistMode"); // R40（缺省 false=旧语义，向后兼容）
++        if (!xdict || xpc_get_type(xdict) != XPC_TYPE_DICTIONARY) return;
++        memset(policy, 0, sizeof(*policy));
++        policy->enabled          = xpc_dictionary_get_bool(xdict, "enabled");
++        policy->hideMounts       = xpc_dictionary_get_bool(xdict, "hideMounts");
++        policy->hideCredentials  = xpc_dictionary_get_bool(xdict, "hideCredentials");
++        policy->hideTrustcache   = xpc_dictionary_get_bool(xdict, "hideTrustcache");
++        policy->stealthLevel     = xpc_dictionary_get_uint64(xdict, "stealthLevel");
++        policy->blacklistMode    = xpc_dictionary_get_bool(xdict, "blacklistMode"); // Flip #8: 缺省 false 本就是白名单语义（名单内=信任，名单外=过滤）——2026-10-11 反转后为正式默认，不再只是"旧语义兼容"
+ }
+ 
+ int cloak_get_policy(cloak_policy_t *policyOut)
+ {
+-	if (policyOut) memset(policyOut, 0, sizeof(*policyOut));
++        if (policyOut) memset(policyOut, 0, sizeof(*policyOut));
+ 
+-	xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_GET_POLICY, NULL);
+-	if (!xreply) return -1;
++        xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_GET_POLICY, NULL);
++        if (!xreply) return -1;
+ 
+-	int result = (int)xpc_dictionary_get_int64(xreply, "result");
+-	if (result == 0 && policyOut) {
+-		policyOut->enabled         = xpc_dictionary_get_bool(xreply, "enabled");
+-		policyOut->hideMounts      = xpc_dictionary_get_bool(xreply, "hideMounts");
+-		policyOut->hideCredentials = xpc_dictionary_get_bool(xreply, "hideCredentials");
+-		policyOut->hideTrustcache  = xpc_dictionary_get_bool(xreply, "hideTrustcache");
+-		policyOut->stealthLevel    = xpc_dictionary_get_uint64(xreply, "stealthLevel");
+-		policyOut->blacklistMode   = xpc_dictionary_get_bool(xreply, "blacklistMode"); // R40
+-	}
+-	xpc_release(xreply);
+-	return result;
++        int result = (int)xpc_dictionary_get_int64(xreply, "result");
++        if (result == 0 && policyOut) {
++                policyOut->enabled         = xpc_dictionary_get_bool(xreply, "enabled");
++                policyOut->hideMounts      = xpc_dictionary_get_bool(xreply, "hideMounts");
++                policyOut->hideCredentials = xpc_dictionary_get_bool(xreply, "hideCredentials");
++                policyOut->hideTrustcache  = xpc_dictionary_get_bool(xreply, "hideTrustcache");
++                policyOut->stealthLevel    = xpc_dictionary_get_uint64(xreply, "stealthLevel");
++                policyOut->blacklistMode   = xpc_dictionary_get_bool(xreply, "blacklistMode"); // R40
++        }
++        xpc_release(xreply);
++        return result;
+ }
+ 
+ int cloak_enable(void)
+ {
+-	xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_ENABLE, NULL);
+-	if (!xreply) return -1;
+-	int result = (int)xpc_dictionary_get_int64(xreply, "result");
+-	xpc_release(xreply);
+-	return result;
++        xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_ENABLE, NULL);
++        if (!xreply) return -1;
++        int result = (int)xpc_dictionary_get_int64(xreply, "result");
++        xpc_release(xreply);
++        return result;
+ }
+ 
+ int cloak_disable(void)
+ {
+-	xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_DISABLE, NULL);
+-	if (!xreply) return -1;
+-	int result = (int)xpc_dictionary_get_int64(xreply, "result");
+-	xpc_release(xreply);
+-	return result;
++        xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_DISABLE, NULL);
++        if (!xreply) return -1;
++        int result = (int)xpc_dictionary_get_int64(xreply, "result");
++        xpc_release(xreply);
++        return result;
+ }
+ 
+ int cloak_set_options(const cloak_policy_t *policy)
+ {
+-	xpc_object_t xargs = cloak_policy_serialize(policy);
+-	xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_SET_OPTIONS, xargs);
+-	xpc_release(xargs);
+-	if (!xreply) return -1;
+-	int result = (int)xpc_dictionary_get_int64(xreply, "result");
+-	xpc_release(xreply);
+-	return result;
++        xpc_object_t xargs = cloak_policy_serialize(policy);
++        xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_SET_OPTIONS, xargs);
++        xpc_release(xargs);
++        if (!xreply) return -1;
++        int result = (int)xpc_dictionary_get_int64(xreply, "result");
++        xpc_release(xreply);
++        return result;
+ }
+ 
+ int cloak_report_mount(const char *mountPoint, const char *error)
+ {
+-	xpc_object_t xargs = xpc_dictionary_create_empty();
+-	if (mountPoint) xpc_dictionary_set_string(xargs, "mountPoint", mountPoint);
+-	if (error) xpc_dictionary_set_string(xargs, "error", error);
+-
+-	xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_MOUNT_REPORT, xargs);
+-	xpc_release(xargs);
+-	if (!xreply) return -1;
+-	int result = (int)xpc_dictionary_get_int64(xreply, "result");
+-	xpc_release(xreply);
+-	return result;
++        xpc_object_t xargs = xpc_dictionary_create_empty();
++        if (mountPoint) xpc_dictionary_set_string(xargs, "mountPoint", mountPoint);
++        if (error) xpc_dictionary_set_string(xargs, "error", error);
++
++        xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_MOUNT_REPORT, xargs);
++        xpc_release(xargs);
++        if (!xreply) return -1;
++        int result = (int)xpc_dictionary_get_int64(xreply, "result");
++        xpc_release(xreply);
++        return result;
+ }
+ 
+ int cloak_get_mount_status(cloak_mount_status_t *statusOut)
+ {
+-	if (statusOut) memset(statusOut, 0, sizeof(*statusOut));
++        if (statusOut) memset(statusOut, 0, sizeof(*statusOut));
+ 
+-	xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_GET_POLICY, NULL);
+-	if (!xreply) return -1;
++        xpc_object_t xreply = jbserver_xpc_send(JBS_DOMAIN_CLOAK, JBS_CLOAK_GET_POLICY, NULL);
++        if (!xreply) return -1;
+ 
+-	int result = (int)xpc_dictionary_get_int64(xreply, "result");
+-	if (result == 0 && statusOut) {
+-		statusOut->active = xpc_dictionary_get_bool(xreply, "mountActive");
+-		const char *mountPoint = xpc_dictionary_get_string(xreply, "mountPoint");
+-		if (mountPoint) {
+-			strlcpy(statusOut->mountPoint, mountPoint, sizeof(statusOut->mountPoint));
+-		}
+-		const char *error = xpc_dictionary_get_string(xreply, "error");
+-		if (error) {
+-			strlcpy(statusOut->error, error, sizeof(statusOut->error));
+-		}
+-	}
+-	xpc_release(xreply);
+-	return result;
++        int result = (int)xpc_dictionary_get_int64(xreply, "result");
++        if (result == 0 && statusOut) {
++                statusOut->active = xpc_dictionary_get_bool(xreply, "mountActive");
++                const char *mountPoint = xpc_dictionary_get_string(xreply, "mountPoint");
++                if (mountPoint) {
++                        strlcpy(statusOut->mountPoint, mountPoint, sizeof(statusOut->mountPoint));
++                }
++                const char *error = xpc_dictionary_get_string(xreply, "error");
++                if (error) {
++                        strlcpy(statusOut->error, error, sizeof(statusOut->error));
++                }
++        }
++        xpc_release(xreply);
++        return result;
+ }
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/systemhook/src/aegis_interpose.c euphoria-v1007-src/BaseBin/systemhook/src/aegis_interpose.c
+--- euphoria-v1007-pristine/BaseBin/systemhook/src/aegis_interpose.c	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/systemhook/src/aegis_interpose.c	2026-10-11 11:45:01.101580421 +0800
+@@ -88,9 +88,15 @@
+         if (!execPath || !execPath[0]) return false;
+         /* Extract the executable basename and the .app bundle dir name.
+          * Policy entries may be either a binary name ("MyApp"), a bundle
+-         * directory ("MyApp.app"), a bundle id ("com.example.MyApp"), or a
+-         * path prefix. We do a flexible match: if the entry appears anywhere
+-         * in the executable path OR equals the basename, it matches. */
++         * directory ("MyApp.app") or a bundle id ("com.example.MyApp").
++         * P2-5 (DRF-3②, 2026-10-11): the old "flexible" substring channel
++         * (entry appears anywhere in execPath) had to go — with the list now
++         * being a *trust whitelist*, a short entry like "Bank" would grant
++         * trust to every app whose path merely contains that substring
++         * (= wrongly un-hidden, a coverage hole), the exact inverse of the
++         * harmless annoyance it was in blacklist days. Matching is exact-only
++         * now: basename or .app bundle directory. Keep this function and
++         * cloak_interpose.c's cloak_process_on_aegis_list in sync. */
+         char pathCopy[MAXPATHLEN];
+         strlcpy(pathCopy, execPath, sizeof(pathCopy));
+ 
+@@ -112,10 +118,8 @@
+                 if (!entry || !entry[0]) continue;
+                 /* exact basename match */
+                 if (strcmp(entry, base) == 0) return true;
+-                /* bundle dir match */
++                /* exact bundle dir match */
+                 if (bundleDir && strcmp(entry, bundleDir) == 0) return true;
+-                /* substring / bundle-id match */
+-                if (strstr(execPath, entry) != NULL) return true;
+         }
+         return false;
+ }
+@@ -141,9 +145,9 @@
+                 for (uint32_t i = 0; i < gAegisPolicy.appCount; i++) {
+                         const char *entry = gAegisPolicy.appBundleIds[i];
+                         if (!entry) continue;
++                        /* P2-5: exact channels only (see aegis_process_matches_list) */
+                         if (strcmp(entry, base) == 0 ||
+-                                (bundleDir && strcmp(entry, bundleDir) == 0) ||
+-                                strstr(execPath, entry) != NULL) {
++                                (bundleDir && strcmp(entry, bundleDir) == 0)) {
+                                 gAegisLevel = gAegisPolicy.appLevels[i];
+                                 return;
+                         }
+@@ -151,9 +155,16 @@
+         }
+         /* Not on the list: fall back to the default level only for processes
+          * that look like user apps (path contains .app); system daemons are
+-         * never shielded by default. */
++         * never shielded by default.
++         * Flip #3 (2026-10-11, deny-by-default): a zero/unset defaultLevel now
++         * means FULL shielding for unlisted .app processes (used to mean OFF).
++         * The aegis list is a trust whitelist since the flip: listed entries
++         * with level 0 (AEGIS_LEVEL_OFF) see the plain truth, everything else
++         * gets shielded. */
+         if (strstr(execPath, ".app/") != NULL) {
+-                gAegisLevel = gAegisPolicy.defaultLevel;
++                gAegisLevel = (gAegisPolicy.defaultLevel != 0)
++                        ? gAegisPolicy.defaultLevel
++                        : AEGIS_LEVEL_FULL;
+         }
+         else {
+                 gAegisLevel = AEGIS_LEVEL_OFF;
+diff -ruN '--exclude=*.tar.gz' euphoria-v1007-pristine/BaseBin/systemhook/src/cloak_interpose.c euphoria-v1007-src/BaseBin/systemhook/src/cloak_interpose.c
+--- euphoria-v1007-pristine/BaseBin/systemhook/src/cloak_interpose.c	2026-09-13 00:22:08.000000000 +0800
++++ euphoria-v1007-src/BaseBin/systemhook/src/cloak_interpose.c	2026-10-11 11:45:37.265713767 +0800
+@@ -38,14 +38,14 @@
+ // kinfo_proc 来自内核，内存布局即完整 _ucred——按 XNU bsd/sys/ucred.h
+ // 前缀（到 cr_svgid）本地定义并强转访问，避免依赖私有头。
+ struct _ucred_xnu_prefix {
+-	u_long  cr_version;
+-	uid_t   cr_uid;
+-	short   cr_ngroups;
+-	gid_t   cr_groups[NGROUPS];
+-	uid_t   cr_ruid;
+-	uid_t   cr_svuid;
+-	uid_t   cr_rgid;
+-	gid_t   cr_svgid;
++        u_long  cr_version;
++        uid_t   cr_uid;
++        short   cr_ngroups;
++        gid_t   cr_groups[NGROUPS];
++        uid_t   cr_ruid;
++        uid_t   cr_svuid;
++        uid_t   cr_rgid;
++        gid_t   cr_svgid;
+ };
+ 
+ cloak_policy_cache_t gCloakPolicy = { 0 };
+@@ -113,15 +113,41 @@
+ /* Policy                                                                    */
+ /* ------------------------------------------------------------------------ */
+ 
+-// R40：本进程是否在 aegis 屏蔽名单（黑名单）内。
+-// 匹配逻辑与 systemhook/src/aegis_interpose.c 的 aegis_process_matches_list
+-// 保持一致（弹性匹配：二进制名/.app 目录名/bundle id/路径子串）——该文件由
+-// root 属主维护，此处内联一份以解耦，改匹配规则时两处同步。
++// Is this process on the aegis list? Since the deny-by-default flip the list
++// is a *trust whitelist*: returning true means "this process may see the
++// unfiltered view". Matching logic must stay in sync with
++// systemhook/src/aegis_interpose.c:aegis_process_matches_list (P2-5: exact
++// basename / .app bundle-dir match only — substring matching would grant
++// trust too liberally on a whitelist).
++//
++// Flip #7 (fail-closed + TTL cache): this used to do a full XPC round-trip
++// on every hooked syscall and treated XPC failure as "not on the list"
++// (fail-open). Two changes:
++//   1. A 30s cache in front of the XPC: a syscall-heavy detection loop must
++//      not be able to measure XPC timing either.
++//   2. XPC failure now keeps the last good snapshot (or an empty policy when
++//      there has never been one). An empty snapshot reads as "not on the
++//      list" — which after the flip means "filtered", i.e. failure fails
++//      closed, never open.
+ static bool cloak_process_on_aegis_list(void)
+ {
+-        aegis_policy_t aegisPolicy = { 0 };
+-        if (aegis_get_policy(&aegisPolicy) != 0) return false;
+-        if (!aegisPolicy.enabled || aegisPolicy.appCount == 0) return false;
++        static aegis_policy_t sListCache = { 0 };
++        static bool sListValid = false;
++        static time_t sListStamp = 0;
++
++        time_t now = time(NULL);
++        if (!sListValid || (now - sListStamp) >= 30) {
++                aegis_policy_t fresh = { 0 };
++                if (aegis_get_policy(&fresh) == 0) {
++                        sListCache = fresh;
++                        sListValid = true;
++                        sListStamp = now;
++                }
++                /* On failure deliberately keep the old snapshot (or none):
++                 * fail-closed by construction — see header comment. */
++        }
++        if (!sListValid) return false;
++        if (!sListCache.enabled || sListCache.appCount == 0) return false;
+ 
+         char execPath[MAXPATHLEN] = { 0 };
+         if (proc_pidpath(getpid(), execPath, sizeof(execPath)) <= 0) return false;
+@@ -138,12 +164,12 @@
+                 bundleDir = slash ? slash + 1 : pathCopy;
+         }
+ 
+-        for (uint32_t i = 0; i < aegisPolicy.appCount; i++) {
+-                const char *entry = aegisPolicy.appBundleIds[i];
++        for (uint32_t i = 0; i < sListCache.appCount; i++) {
++                const char *entry = sListCache.appBundleIds[i];
+                 if (!entry || !entry[0]) continue;
++                /* P2-5: exact channels only — sync with aegis_process_matches_list */
+                 if (strcmp(entry, base) == 0) return true;
+                 if (bundleDir && strcmp(entry, bundleDir) == 0) return true;
+-                if (strstr(execPath, entry) != NULL) return true;
+         }
+         return false;
+ }
+@@ -173,12 +199,16 @@
+         uint32_t execPathLen = sizeof(execPath);
+         if (_NSGetExecutablePath(execPath, &execPathLen) != 0) return false;
+ 
+-        // R40（用户 2026-08-29 17:00 定案）黑名单制：不在 aegis 名单上的进程
+-        // 一律信任——文件管理器等越狱生态工具靠越狱/巨魔提权工作（用户原话
+-        // "他就是靠越狱和巨魔来提升管理器权限"），屏蔽它们等于废掉它们；
+-        // 只有被拉黑的 app（检测越狱的那些）才吃过滤视图。
+-        // blacklistMode=false 时维持 R40 前旧语义（非受信全隐藏，兜底开关）。
+-        if (gCloakPolicy.blacklistMode && !cloak_process_on_aegis_list()) {
++        // Flip #2 (2026-10-11, user decision "hide from third parties after
++        // jailbreak"): the aegis list is now a TRUST whitelist, not a block
++        // list. Processes on the list (file managers and other jailbreak
++        // ecosystem tools that need the unfiltered view to work) are trusted;
++        // everything else — every ordinary app — gets the filtered view.
++        // Default policy value is whitelist mode (blacklistMode == false):
++        // unlisted untrusted apps are hidden from, which is the entire point
++        // of the hidden environment. The old R40 blacklist branch is kept
++        // only as the opt-out marker path (see daemon main.m).
++        if (!gCloakPolicy.blacklistMode && cloak_process_on_aegis_list()) {
+                 return true;
+         }
+ 
+@@ -253,12 +283,39 @@
+ // compile nor link for this target. Apps on iOS use getfsstat/statfs,
+ // which stay hooked.
+ 
+-static int statfs_common(const char *path, int origRv, int *errnoOut)
++// P0-3 (2026-10-11): statfs on a hidden mount used to return ENOENT — but on
++// a STOCK device every one of these paths (they sit on the sealed system
++// volume or are plain directories) statfs()s successfully, so an error was
++// itself a jailbreak fingerprint ("an error is a fingerprint", B-line rule).
++// With rootful fixed + the deny-by-default flip every untrusted app eats
++// this filter, so the fingerprint would fire for every detection probe on
++// day one. New contract (A-line dual-track fix):
++//   - statfs(path) on a hidden mount: fabricate the underlying system-volume
++//     entry — template from a real orig statfs("/") call, f_mntonname pinned
++//     to "/" — and return 0. The four comparison fields the detectors hash
++//     (f_type/f_flags/f_fstypename/f_bsize) then match stock byte-for-byte,
++//     because they come from the real system volume.
++//   - getfsstat enumeration: keep DROPPING the entries (a stock mount table
++//     simply does not contain them — dropping is the stock-faithful answer).
++// ENOENT survives only as the last-resort fallback when the template query
++// itself fails (better a stale fingerprint than a crash or a lie).
++static int statfs_common(const char *path, struct statfs *buf, int origRv, int *errnoOut)
+ {
+         if (origRv == 0 &&
+                 gCloakPolicy.hideMounts &&
+                 !cloak_process_is_trusted() &&
+                 cloak_mount_is_hidden(path)) {
++                if (buf && cloak_statfs_orig) {
++                        struct statfs systemVolume = { 0 };
++                        if (cloak_statfs_orig("/", &systemVolume) == 0) {
++                                memcpy(buf, &systemVolume, sizeof(struct statfs));
++                                strlcpy(buf->f_mntonname, "/", sizeof(buf->f_mntonname));
++                                *errnoOut = 0;
++                                return 0;
++                        }
++                        // Template query failed — fall through to ENOENT below
++                        // (documented last-resort, see header comment).
++                }
+                 *errnoOut = ENOENT;
+                 return -1;
+         }
+@@ -271,7 +328,7 @@
+         if (!cloak_statfs_orig) { errno = ENOENT; return -1; }
+         int r = cloak_statfs_orig(path, buf);
+         int e = errno;
+-        int filtered = statfs_common(path, r, &e);
++        int filtered = statfs_common(path, buf, r, &e);
+         errno = e;
+         return filtered;
+ }
+
+### P1-F1 incremental fixes (A1/A2/A3) — base: DL-v1 state (first 2795 lines). v1->v1.1, A-line findings, merged pre-P1-F1 packaging.
+diff -ruN 'P1-F1 incremental A1' euphoria-v1007-src/Application/Euphoria/zh-Hans.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/zh-Hans.lproj/Localizable.strings
++++ euphoria-v1007-src/Application/Euphoria/zh-Hans.lproj/Localizable.strings	2026-10-11 12:36:10.658834838 +0800
+@@ -166,6 +166,8 @@
+ 	<string>Rootful 模式</string>
+ 	<key>Rootful_Mode_Footer</key>
+ 	<string>适用于支持的设备（A12/A13，iOS 16.6.1–18.7.1）。首次激活约需数分钟，关闭时卷与数据保留。</string>
++	<key>Rootful_Mode_Fixed_Footer</key>
++	<string>本构建为固定 Rootful：每次越狱均挂载真实根文件系统，隐藏环境（屏蔽）随之自动开启。模式开关已按设计移除；支持设备为 A12/A13、iOS 16.6.1–18.7.1。运维逃生通道（marker 文件）保留可用。</string>
+ 	<key>Roothide_Mode</key>
+ 	<string>Roothide 隐藏模式</string>
+ 	<key>Roothide_Mode_Footer</key>
+diff -ruN 'P1-F1 incremental A2' euphoria-v1007-src/Application/Euphoria/Jailbreak/EUBootstrapper.m euphoria-v1007-src/Application/Euphoria/Jailbreak/EUBootstrapper.m
++++ euphoria-v1007-src/Application/Euphoria/Jailbreak/EUBootstrapper.m	2026-10-11 12:36:40.297762149 +0800
+@@ -546,7 +546,7 @@
+         NSArray *list = root[modeKey];
+         if (![list isKindOfClass:[NSArray class]]) {
+             // 防御：无该模式段时回退另一段，再回退空
+-            list = root[@"Mode-Rothide"];
++            list = root[@"Mode-Roothide"];
+             if (![list isKindOfClass:[NSArray class]]) list = @[];
+         }
+         sources = list;
+@@ -686,10 +686,10 @@
+         if (shouldInstallElleKit) {
+             [[EUUIManager sharedInstance] sendLog:@"Installing ElleKit (Tweak Injector)" debug:NO];
+             // R25-2 双保险：①模式预选（bootstrapModeKey SSOT 判定：Mode-Rootless→rootless
+-            // 件 iphoneos-arm64；Mode-Rothide→roothide 件 arm64e）②失败 fallback 换另一
++            // 件 iphoneos-arm64；Mode-Roothide→roothide 件 arm64e）②失败 fallback 换另一
+             // 变体（覆盖判定与设备 dpkg 实态不匹配的混杂态）。
+             NSString *modeKey = [self bootstrapModeKey];
+-            BOOL roothideMode = [modeKey isEqualToString:@"Mode-Rothide"];
++            BOOL roothideMode = [modeKey isEqualToString:@"Mode-Roothide"];
+             NSString *ellekitPath = [[NSBundle mainBundle].bundlePath
+                 stringByAppendingPathComponent:(roothideMode ? @"ellekit_roothide.deb" : @"ellekit.deb")];
+             NSString *ellekitAltPath = [[NSBundle mainBundle].bundlePath
+diff -ruN 'P1-F1 incremental A3' euphoria-v1007-src/BaseBin/jbctl/src/main.m euphoria-v1007-src/BaseBin/jbctl/src/main.m
++++ euphoria-v1007-src/BaseBin/jbctl/src/main.m	2026-10-11 12:36:40.297762149 +0800
+@@ -409,7 +409,7 @@
+                 else if (!strcmp(aegisCmd, "add")) {
+                         if (argc < 4) { printf("Usage: jbctl aegis add <bundleId> [level]\n"); return 1; }
+                         const char *bid = argv[3];
+-                        uint64_t level = (argc >= 5) ? strtoull(argv[4], NULL, 10) : AEGIS_LEVEL_FULL;
++                        uint64_t level = (argc >= 5) ? strtoull(argv[4], NULL, 10) : AEGIS_LEVEL_OFF;
+                         int r = aegis_add_app(bid, level);
+                         if (r != 0) { printf("Error: aegis_add_app failed\n"); return r; }
+                         printf("Aegis: added %s at level %llu\n", bid, (unsigned long long)level);
+
+### P1-F1 incremental #2 — deep glass UI (frosted main button + glass action menu + global stardust). Base: DL-v1.1 state (= pristine for these 3 files, untouched by main patch). v1.1 -> v1.2.
+diff -ruN 'P1-F1 glass' euphoria-v1007-src/Application/Euphoria/UI/EUJailbreakButton.h euphoria-v1007-src/Application/Euphoria/UI/EUJailbreakButton.h
++++ euphoria-v1007-src/Application/Euphoria/UI/EUJailbreakButton.h	2026-10-11 12:42:16.793290038 +0800
+@@ -20,6 +20,11 @@
+ @property UIView<EULogViewProtocol> *logView;
+ @property EUPkgManagerPickerView *pkgManagerPickerView;
+ 
++// P1-F1 深度毛玻璃（docs/08-仙境风UI设计规范.md §3-1 卡片规格落地）：
++@property (nonatomic) UIVisualEffectView *glassView;      // systemChromeMaterialDark 玻璃底
++@property (nonatomic) UIView *glassTintView;              // 主题染色叠层（玻璃上保留 Euphoria 紫）
++@property (nonatomic) CAShapeLayer *glassBorder;          // 1px 月白 12% 环贴描边
++
+ @property (nonatomic, getter=isEnabled) BOOL enabled;
+ @property (nonatomic) BOOL didExpand;
+ @property (nonatomic, assign) pthread_mutex_t canStartJailbreak;
+diff -ruN 'P1-F1 glass' euphoria-v1007-src/Application/Euphoria/UI/EUJailbreakButton.m euphoria-v1007-src/Application/Euphoria/UI/EUJailbreakButton.m
++++ euphoria-v1007-src/Application/Euphoria/UI/EUJailbreakButton.m	2026-10-11 12:42:33.471811857 +0800
+@@ -17,12 +17,42 @@
+ {
+     if (self = [super init])
+     {
+-        self.backgroundColor = [EUThemeManager menuColorWithAlpha:1.0];
+-        self.layer.cornerRadius = 14;
++        // P1-F1 深度毛玻璃：主按钮=玻璃卡片（docs/08 §3-1：systemChromeMaterialDark
++        // 玻璃底 + 主题染色 + 24pt 连续圆角 + 1px 月白 12% 描边；展开态玻璃淡出见 expandButton）
++        self.backgroundColor = [UIColor clearColor];
++        self.layer.cornerRadius = 24;
+         self.layer.masksToBounds = YES;
+         self.layer.cornerCurve = kCACornerCurveContinuous;
+         self.translatesAutoresizingMaskIntoConstraints = NO;
+ 
++        self.glassView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark]];
++        self.glassView.translatesAutoresizingMaskIntoConstraints = NO;
++        self.glassView.userInteractionEnabled = NO;
++        [self insertSubview:self.glassView atIndex:0];
++
++        self.glassTintView = [[UIView alloc] init];
++        self.glassTintView.backgroundColor = [EUThemeManager menuColorWithAlpha:0.35];
++        self.glassTintView.translatesAutoresizingMaskIntoConstraints = NO;
++        self.glassTintView.userInteractionEnabled = NO;
++        [self insertSubview:self.glassTintView aboveSubview:self.glassView];
++
++        self.glassBorder = [CAShapeLayer layer];
++        self.glassBorder.strokeColor = [UIColor colorWithWhite:0.92 alpha:0.12].CGColor; // 月白 12%
++        self.glassBorder.fillColor = [UIColor clearColor].CGColor;
++        self.glassBorder.lineWidth = 1.0;
++        [self.layer addSublayer:self.glassBorder];
++
++        [NSLayoutConstraint activateConstraints:@[
++            [self.glassView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor],
++            [self.glassView.trailingAnchor constraintEqualToAnchor:self.trailingAnchor],
++            [self.glassView.topAnchor constraintEqualToAnchor:self.topAnchor],
++            [self.glassView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
++            [self.glassTintView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor],
++            [self.glassTintView.trailingAnchor constraintEqualToAnchor:self.trailingAnchor],
++            [self.glassTintView.topAnchor constraintEqualToAnchor:self.topAnchor],
++            [self.glassTintView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
++        ]];
++
+         self.button = [EUActionMenuButton buttonWithAction:actions chevron:NO];
+         [self.button setContentHorizontalAlignment:UIControlContentHorizontalAlignmentCenter];
+         self.button.translatesAutoresizingMaskIntoConstraints = NO;
+@@ -67,6 +97,16 @@
+     
+     [self.button setUserInteractionEnabled:NO];
+ 
++    // P1-F1：展开态=全屏功能容器——玻璃底/染色/描边淡出（全屏模糊过重，log/picker 自带样式）
++    [UIView animateWithDuration:0.2 animations:^{
++        [self.glassView setAlpha:0.0];
++        [self.glassTintView setAlpha:0.0];
++        [CATransaction begin];
++        [CATransaction setAnimationDuration:0.2];
++        self.glassBorder.opacity = 0.0;
++        [CATransaction commit];
++    }];
++
+     [UIView animateWithDuration: 0.2 animations:^{ [self.button setAlpha:0.0]; }];
+     [UIView animateWithDuration:0.75 delay:0.0 usingSpringWithDamping:0.9 initialSpringVelocity:2.0  options: UIViewAnimationOptionCurveEaseInOut animations:^{
+         [window layoutIfNeeded];
+@@ -184,6 +224,15 @@
+     }
+ }
+ 
++// P1-F1：描边环贴圆角——布局变化后同步 path（展开动画期间随 bounds 变化）
++- (void)layoutSubviews
++{
++    [super layoutSubviews];
++    self.glassBorder.path = [UIBezierPath bezierPathWithRoundedRect:self.bounds
++                                                   byRoundingCorners:UIRectCornerAllCorners
++                                                         cornerRadii:CGSizeMake(24, 24)].CGPath;
++}
++
+ - (BOOL)isEnabled
+ {
+     return self.button.userInteractionEnabled;
+diff -ruN 'P1-F1 glass' euphoria-v1007-src/Application/Euphoria/UI/EUNavigationController.m euphoria-v1007-src/Application/Euphoria/UI/EUNavigationController.m
++++ euphoria-v1007-src/Application/Euphoria/UI/EUNavigationController.m	2026-10-11 12:43:04.977797581 +0800
+@@ -10,12 +10,14 @@
+ #import "EUModalBackAction.h"
+ #import "EUGlobalAppearance.h"
+ #import "EUThemeManager.h"
++#import "EUFairyStyle.h" // P1-F1 深度毛玻璃：星尘微粒（docs/08 §4-1，ReduceMotion 自动降级）
+ 
+ @interface EUNavigationController ()
+ 
+ @property (nonatomic) UIImageView *backgroundImageView;
+ @property (nonatomic) EUMainViewController *mainView;
+ @property (nonatomic) EUModalBackAction *backAction;
++@property (nonatomic) CAEmitterLayer *stardustLayer; // P1-F1：全局星尘（仅主背景层，§3 克制律）
+ 
+ @end
+ 
+@@ -56,6 +58,15 @@
+         [self.backgroundImageView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:100],
+     ]];
+ 
++    // P1-F1 深度毛玻璃（仙境氛围）：全局星尘微粒层（docs/08 §4-1——birthRate 12/s、
++    // 上升漂移、1.5pt 月白 60%；仅挂主背景层=克制律合规；ReduceMotion 时返回 nil 跳过）
++    self.stardustLayer = [EUFairyStyle stardustLayerInView:self.view];
++    if (self.stardustLayer)
++    {
++        self.stardustLayer.zPosition = 0; // 背景图(z=-1)之上、内容之下
++        self.stardustLayer.frame = self.view.bounds;
++    }
++
+     self.backAction = [[EUModalBackAction alloc] initWithAction:^{
+         [self popViewControllerAnimated:YES];
+     }];
+@@ -81,6 +92,13 @@
+     self.backAction.hidden = !dimmed;
+ }
+ 
++// P1-F1：星尘 emitter frame 随视图尺寸同步（旋转/分屏）
++- (void)viewDidLayoutSubviews
++{
++    [super viewDidLayoutSubviews];
++    self.stardustLayer.frame = self.view.bounds;
++}
++
+ #pragma mark - Delegate
+ 
+ - (id<UIViewControllerAnimatedTransitioning>)navigationController:(UINavigationController *)navigationController
+diff -ruN 'P1-F1 glass' euphoria-v1007-src/Application/Euphoria/UI/ActionMenu/EUActionMenuView.m euphoria-v1007-src/Application/Euphoria/UI/ActionMenu/EUActionMenuView.m
++++ euphoria-v1007-src/Application/Euphoria/UI/ActionMenu/EUActionMenuView.m	2026-10-11 12:42:47.329245413 +0800
+@@ -10,6 +10,11 @@
+ #import "EUGlobalAppearance.h"
+ #import "EUThemeManager.h"
+ 
++@interface EUActionMenuView ()
++// P1-F1 深度毛玻璃：玻璃描边层（layoutSubviews 懒建，环贴 24pt 圆角）
++@property (nonatomic) CAShapeLayer *glassBorder;
++@end
++
+ @implementation EUActionMenuView
+ 
+ - (instancetype)initWithActions:(NSArray<UIAction*> *)actions delegate:(id<EUActionMenuDelegate>)delegate
+@@ -18,14 +23,43 @@
+     {
+         [self setDelegate:delegate];
+         [self setActions:actions];
+-        self.backgroundColor = [EUThemeManager menuColorWithAlpha:1.0];
+-        self.layer.cornerRadius = 14;
++        // P1-F1 深度毛玻璃：弹出菜单=玻璃卡片（docs/08 §3-1：systemChromeMaterialDark
++        // 玻璃底 + 主题染色 + 24pt 连续圆角 + 1px 月白 12% 描边，与主按钮同规格）
++        self.backgroundColor = [EUThemeManager menuColorWithAlpha:0.18];
++        self.layer.cornerRadius = 24;
+         self.layer.masksToBounds = YES;
+         self.layer.cornerCurve = kCACornerCurveContinuous;
++
++        UIVisualEffectView *glass = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark]];
++        glass.translatesAutoresizingMaskIntoConstraints = NO;
++        glass.userInteractionEnabled = NO;
++        [self insertSubview:glass atIndex:0];
++
++        [NSLayoutConstraint activateConstraints:@[
++            [glass.leadingAnchor constraintEqualToAnchor:self.leadingAnchor],
++            [glass.trailingAnchor constraintEqualToAnchor:self.trailingAnchor],
++            [glass.topAnchor constraintEqualToAnchor:self.topAnchor],
++            [glass.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
++        ]];
+     }
+     return self;
+ }
+ 
++// P1-F1：描边环贴圆角——布局后同步 path
++- (void)layoutSubviews
++{
++    [super layoutSubviews];
++    if (self.glassBorder == nil)
++    {
++        self.glassBorder = [CAShapeLayer layer];
++        self.glassBorder.strokeColor = [UIColor colorWithWhite:0.92 alpha:0.12].CGColor; // 月白 12%
++        self.glassBorder.fillColor = [UIColor clearColor].CGColor;
++        self.glassBorder.lineWidth = 1.0;
++        [self.layer addSublayer:self.glassBorder];
++    }
++    self.glassBorder.path = [UIBezierPath bezierPathWithRoundedRect:self.bounds cornerRadius:24].CGPath;
++}
++
+ - (void)setActions:(NSArray *)actions
+ {
+     _actions = actions;
+
+### v1.3 dead-asset cleanup — base: v1.2 state (en/zh-Hans/zh-TW base = post-v1.2-tree; 23 languages and EPM files base = pristine, untouched by prior segments). Removes 26-language dead locale keys (Roothide switch copy / legacy Rootful footer / Purge strings; UI refs already removed by main patch; bundle-level jailbreak-semantics fingerprint per stealth rule), zh-TW Fixed_Footer backfill, EPM entry + minimal VC (unfulfilled install-domain promise). 29 file sections.
+diff -ruN 'v1.3 deadkey ar' euphoria-v1007-src/Application/Euphoria/ar.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/ar.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/ar.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/ar.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey da' euphoria-v1007-src/Application/Euphoria/da.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/da.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/da.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/da.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey de' euphoria-v1007-src/Application/Euphoria/de.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/de.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/de.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/de.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -134,5 +134,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey el' euphoria-v1007-src/Application/Euphoria/el.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/el.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/el.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/el.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey es' euphoria-v1007-src/Application/Euphoria/es.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/es.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/es.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/es.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -133,5 +133,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey fil' euphoria-v1007-src/Application/Euphoria/fil.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/fil.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/fil.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/fil.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey fr' euphoria-v1007-src/Application/Euphoria/fr.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/fr.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/fr.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/fr.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey it' euphoria-v1007-src/Application/Euphoria/it.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/it.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/it.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/it.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -119,5 +119,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey ja' euphoria-v1007-src/Application/Euphoria/ja.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/ja.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/ja.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/ja.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -133,5 +133,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey kk' euphoria-v1007-src/Application/Euphoria/kk.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/kk.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/kk.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/kk.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey ko' euphoria-v1007-src/Application/Euphoria/ko.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/ko.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/ko.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/ko.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -133,5 +133,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey nl' euphoria-v1007-src/Application/Euphoria/nl.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/nl.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/nl.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/nl.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey pl' euphoria-v1007-src/Application/Euphoria/pl.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/pl.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/pl.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/pl.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey pt-BR' euphoria-v1007-src/Application/Euphoria/pt-BR.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/pt-BR.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/pt-BR.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/pt-BR.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -120,5 +120,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey ru' euphoria-v1007-src/Application/Euphoria/ru.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/ru.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/ru.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/ru.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey sv' euphoria-v1007-src/Application/Euphoria/sv.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/sv.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/sv.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/sv.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey th' euphoria-v1007-src/Application/Euphoria/th.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/th.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/th.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/th.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey tr' euphoria-v1007-src/Application/Euphoria/tr.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/tr.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/tr.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/tr.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey uk' euphoria-v1007-src/Application/Euphoria/uk.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/uk.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/uk.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/uk.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey ur' euphoria-v1007-src/Application/Euphoria/ur.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/ur.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/ur.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/ur.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey vi' euphoria-v1007-src/Application/Euphoria/vi.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/vi.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/vi.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/vi.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -129,5 +129,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey zh-CN' euphoria-v1007-src/Application/Euphoria/zh-CN.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/zh-CN.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/zh-CN.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/zh-CN.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -126,5 +126,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey zh-HK' euphoria-v1007-src/Application/Euphoria/zh-HK.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/zh-HK.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/zh-HK.lproj/Localizable.strings	2026-10-11 12:45:00.000000000 +0800 (pre-v1.3)
++++ euphoria-v1007-src/Application/Euphoria/zh-HK.lproj/Localizable.strings	2026-10-11 12:55:00.000000000 +0800 (v1.3 cleanup)
+@@ -127,5 +127,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria app icon from the home screen (Dopamine-style). Use Spotlight search to find it again.";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey en' euphoria-v1007-src/Application/Euphoria/en.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/en.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/en.lproj/Localizable.strings	(pre-v1.3 state)
++++ euphoria-v1007-src/Application/Euphoria/en.lproj/Localizable.strings	(v1.3 cleanup)
+@@ -131,11 +131,7 @@
+ /* Rootful (T15) & Aegis (R27 restored, user 08-28) */
+ "Section_Rootful" = "Rootful";
+ "Rootful_Mode" = "Rootful Mode";
+-"Rootful_Mode_Footer" = "On supported devices (A12/A13, iOS 16.6.1–18.7.1). First activation may take several minutes. Disabling keeps the volume and data.";
+ "Rootful_Mode_Fixed_Footer" = "This build is rootful-only: every jailbreak mounts the real root filesystem, and the hidden environment (shielding) rides along automatically. The mode switch has been removed by design; supported devices are A12/A13 on iOS 16.6.1-18.7.1. Operator escape hatches (/basebin marker files) remain available for maintenance.";
+-"Button_Purge_Rootful" = "Erase Rootful Volume";
+-"Alert_Purge_Rootful_Title" = "Erase Rootful Volume";
+-"Alert_Purge_Rootful_Body" = "This uninstalls the rootful overlay, destroys the volume and clears its state. This cannot be undone. Continue?";
+ "Hide_Jailbreak_Apps" = "Hide Jailbreak Apps";
+ "Hide_Jailbreak_Apps_Footer" = "Hides the Euphoria app icon via Aegis shield policy. Use Spotlight or Settings to find it again while hidden.";
+ "Hide_Jailbreak_Traces" = "Hide Jailbreak Traces";
+@@ -144,5 +140,3 @@
+ "Hide_Jailbreak" = "Hide Jailbreak";
+ "Hide_Jailbreak_Footer" = "Hides the Euphoria icon from the Home Screen. Find it again via Spotlight search (same behavior as Dopamine).";
+ // R37 roothide mode
+-"Roothide_Mode" = "Roothide Mode";
+-"Roothide_Mode_Footer" = "Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.";
+
+diff -ruN 'v1.3 deadkey zh-Hans' euphoria-v1007-src/Application/Euphoria/zh-Hans.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/zh-Hans.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/zh-Hans.lproj/Localizable.strings	(pre-v1.3 state)
++++ euphoria-v1007-src/Application/Euphoria/zh-Hans.lproj/Localizable.strings	(v1.3 cleanup)
+@@ -4,10 +4,6 @@
+ <dict>
+ 	<key>Alert_Change_Mobile_Password_Body</key>
+ 	<string>这将会在你的设备上修改 “mobile” 密码，此密码可用于使用 sudo 命令。如需设置 “root” 密码，请在 shell 中使用命令 “sudo passwd root”。</string>
+-	<key>Alert_Purge_Rootful_Body</key>
+-	<string>将卸载 rootful 覆盖挂载、销毁卷并清空状态，不可恢复。确定继续吗？</string>
+-	<key>Alert_Purge_Rootful_Title</key>
+-	<string>彻底删除 Rootful 卷</string>
+ 	<key>Alert_Remove_Jailbreak_Enabled_Body</key>
+ 	<string>“移除越狱” 将在下次越狱时移除所有和越狱相关的文件，而常规的 App、文档及数据不会受到任何影响。请注意，此操作无法撤销。确认要移除越狱吗？</string>
+ 	<key>Alert_Remove_Jailbreak_Pressed_Body</key>
+@@ -40,8 +36,6 @@
+ 	<string>继续</string>
+ 	<key>Button_Jailbreak_Title</key>
+ 	<string>越狱</string>
+-	<key>Button_Purge_Rootful</key>
+-	<string>彻底删除 Rootful 卷</string>
+ 	<key>Button_Reboot</key>
+ 	<string>重启</string>
+ 	<key>Button_Refresh_Jailbreak_Apps</key>
+@@ -164,14 +158,8 @@
+ 	<string>在你的设备上该临时方案并非每次都生效，可能需要多次应用，直到此提示不再出现为止。</string>
+ 	<key>Rootful_Mode</key>
+ 	<string>Rootful 模式</string>
+-	<key>Rootful_Mode_Footer</key>
+-	<string>适用于支持的设备（A12/A13，iOS 16.6.1–18.7.1）。首次激活约需数分钟，关闭时卷与数据保留。</string>
+ 	<key>Rootful_Mode_Fixed_Footer</key>
+ 	<string>本构建为固定 Rootful：每次越狱均挂载真实根文件系统，隐藏环境（屏蔽）随之自动开启。模式开关已按设计移除；支持设备为 A12/A13、iOS 16.6.1–18.7.1。运维逃生通道（marker 文件）保留可用。</string>
+-	<key>Roothide_Mode</key>
+-	<string>Roothide 隐藏模式</string>
+-	<key>Roothide_Mode_Footer</key>
+-	<string>对应用隐藏越狱（roothide）。Rootful 依赖它：开 rootful 会自动开 roothide；关 roothide 则 rootful 不可用。</string>
+ 	<key>SPTM Bypass</key>
+ 	<string>SPTM 绕过</string>
+ 	<key>Section_Actions</key>
+
+diff -ruN 'v1.3 deadkey zh-TW' euphoria-v1007-src/Application/Euphoria/zh-TW.lproj/Localizable.strings euphoria-v1007-src/Application/Euphoria/zh-TW.lproj/Localizable.strings
+--- euphoria-v1007-src/Application/Euphoria/zh-TW.lproj/Localizable.strings	(pre-v1.3 state)
++++ euphoria-v1007-src/Application/Euphoria/zh-TW.lproj/Localizable.strings	(v1.3 cleanup)
+@@ -4,10 +4,6 @@
+ <dict>
+ 	<key>Alert_Change_Mobile_Password_Body</key>
+ 	<string>設定此裝置上「mobile」使用者的密碼，此密碼也可搭配 sudo 取得 root 權限。若要設定 root 密碼，可在 mobile Shell 中執行「sudo passwd root」。</string>
+-	<key>Alert_Purge_Rootful_Body</key>
+-	<string>這將在你的裝置上移除 rootful 疊加掛載、銷毀卷宗並清空狀態，不可復原。確定要繼續嗎？</string>
+-	<key>Alert_Purge_Rootful_Title</key>
+-	<string>徹底刪除 Rootful 卷宗</string>
+ 	<key>Alert_Remove_Jailbreak_Enabled_Body</key>
+ 	<string>啟用「移除越獄」後，將在下次越獄時刪除所有越獄相關檔案，但會保留一般應用程式、檔案與資料。確定要繼續嗎？此操作無法復原。</string>
+ 	<key>Alert_Remove_Jailbreak_Pressed_Body</key>
+@@ -42,8 +38,6 @@
+ 	<string>隱藏越獄</string>
+ 	<key>Button_Jailbreak_Title</key>
+ 	<string>越獄</string>
+-	<key>Button_Purge_Rootful</key>
+-	<string>清除 Rootful 卷宗</string>
+ 	<key>Button_Reboot</key>
+ 	<string>重新開機</string>
+ 	<key>Button_Refresh_Jailbreak_Apps</key>
+@@ -170,12 +164,6 @@
+ 	<string>在您的裝置上，此因應措施不一定每次都能成功，可能需要重複套用數次，直到這個提示不再出現。</string>
+ 	<key>Rootful_Mode</key>
+ 	<string>Rootful 模式</string>
+-	<key>Rootful_Mode_Footer</key>
+-	<string>為本次越獄建立可持久化的 rootful 疊加卷宗（重新開機後仍保留）。改動此選項後需重新越獄。</string>
+-	<key>Roothide_Mode</key>
+-	<string>Roothide Mode</string>
+-	<key>Roothide_Mode_Footer</key>
+-	<string>Hides the jailbreak from apps (roothide). Rootful requires this: enabling rootful auto-enables roothide; turning roothide off disables rootful.</string>
+ 	<key>SPTM Bypass</key>
+ 	<string>繞過 SPTM</string>
+ 	<key>Section_Actions</key>
+@@ -188,6 +176,8 @@
+ 	<string>漏洞利用</string>
+ 	<key>Section_Jailbreak_Settings</key>
+ 	<string>越獄設定</string>
++	<key>Rootful_Mode_Fixed_Footer</key>
++	<string>本構建為固定 Rootful：每次越獄均掛載真實根檔案系統，隱藏環境（屏蔽）隨之自動開啟。模式開關已按設計移除；支援裝置為 A12/A13、iOS 16.6.1–18.7.1。運維逃生通道（marker 檔案）保留可用。</string>
+ 	<key>Section_Rootful</key>
+ 	<string>Rootful</string>
+ 	<key>Select_Image</key>
+
+diff -ruN 'v1.3 EPM removal' euphoria-v1007-src/Application/Euphoria/UI/PkgManagers/EUPkgManagerPickerViewController.h euphoria-v1007-src/Application/Euphoria/UI/PkgManagers/EUPkgManagerPickerViewController.h
+--- euphoria-v1007-src/Application/Euphoria/UI/PkgManagers/EUPkgManagerPickerViewController.h	(pre-v1.3 state)
++++ euphoria-v1007-src/Application/Euphoria/UI/PkgManagers/EUPkgManagerPickerViewController.h	(v1.3 cleanup)
+@@ -12,11 +12,4 @@
+ @interface EUPkgManagerPickerViewController : UIViewController
+ 
+ @end
+-
+-/// EPM（自研包管理器·T18 契约 v1）内嵌页：已装包清单浏览+刷新。
+-/// v1 诚实边界：安装/升级/搜索=下批；未越狱态进入=诚实提示。
+-/// 实现在 EUPkgManagerPickerViewController.m（C 2026-09-05 落码）。
+-@interface EUPMPackagesViewController : UIViewController
+-@end
+-
+ NS_ASSUME_NONNULL_END
+
+diff -ruN 'v1.3 EPM removal' euphoria-v1007-src/Application/Euphoria/UI/PkgManagers/EUPkgManagerPickerViewController.m euphoria-v1007-src/Application/Euphoria/UI/PkgManagers/EUPkgManagerPickerViewController.m
+--- euphoria-v1007-src/Application/Euphoria/UI/PkgManagers/EUPkgManagerPickerViewController.m	(pre-v1.3 state)
++++ euphoria-v1007-src/Application/Euphoria/UI/PkgManagers/EUPkgManagerPickerViewController.m	(v1.3 cleanup)
+@@ -10,326 +10,6 @@
+ #import "EUEnvironmentManager.h"
+ #import "EUUIManager.h"
+ #import <libjailbreak/libjailbreak.h>
+-#import <spawn.h>
+-#import <sys/stat.h> // R14 v2 固定源区：lstat st_flags & UF_IMMUTABLE 锁定态
+-
+-// ═══════════════════════════════════════════════════════════════════════════
+-// EUPMPackagesViewController —— EPM（自研包管理器·T18 契约 v1）最小内嵌页
+-// 用户 2026-09-05 19:35:28 点名"每次选项都没有你们的自研包管理器"的入口落码。
+-//
+-// v1 范围（诚实边界）：已装包清单浏览（dpkg -l ii 行解析）+ 刷新。
+-// 搜索/安装/升级/源管理=下批（契约 07-EUPM包管理器接口契约_T18-0.md 的
+-// apt-cache/apt-get 全量面），本页不放占位假按钮。
+-// 通道：posix_spawn 管道捕获 stdout（exec_cmd 系无输出变体）+ runAsRoot
+-// 临时提权块（get_root→块→drop_root，同线程 uid 往返恢复）。
+-// 落码：并行搜索员C，2026-09-05。
+-//
+-// 固定源区 UI（ADR-R14 §6.3-b：用户"删不掉"的完整体验由 EPM 层兑现）——B 落码：
+-//   · 锁定态着色（🔒 青绿=chflags 防呆在位 / 琥珀=待补锁）+ 空态防呆占位（未越狱
+-//     /源未写入两分支指引，不留空白区）+ 段头暗色沉浸；
+-//   · 点击固定源→真态语义弹窗（SSOT/重放自愈/root 不可误删），删除交互恒不存在；
+-//   · 下拉刷新（UIRefreshControl，iOS 9 兜底 addSubview 路径）。
+-//   数据位增量：sources dict 增 isLocked(BOOL) 供着色，C 的读取/解析逻辑零改动。
+-//   2026-09-06，B。
+-// ═══════════════════════════════════════════════════════════════════════════
+-
+-static NSString *EUPMCaptureCommandOutput(NSString *binary, NSArray<NSString *> *args)
+-{
+-    int outfd[2];
+-    if (pipe(outfd) != 0) return nil;
+-
+-    posix_spawn_file_actions_t actions;
+-    posix_spawn_file_actions_init(&actions);
+-    posix_spawn_file_actions_adddup2(&actions, outfd[1], STDOUT_FILENO);
+-    posix_spawn_file_actions_addclose(&actions, outfd[0]);
+-    posix_spawn_file_actions_addclose(&actions, outfd[1]);
+-
+-    // argv 组装（posix_spawn 语义：argv[0]=程序名惯例）
+-    const char **argv = calloc(args.count + 2, sizeof(char *));
+-    argv[0] = binary.fileSystemRepresentation;
+-    for (NSUInteger i = 0; i < args.count; i++) {
+-        argv[i + 1] = args[i].fileSystemRepresentation;
+-    }
+-    // argv 末位 NULL 由 calloc 零值保证
+-
+-    pid_t pid = -1;
+-    extern char **environ;
+-    int r = posix_spawn(&pid, binary.fileSystemRepresentation, &actions, NULL,
+-                        (char *const *)argv, environ);
+-    close(outfd[1]);
+-    free(argv);
+-    if (r != 0) {
+-        posix_spawn_file_actions_destroy(&actions);
+-        close(outfd[0]);
+-        return nil;
+-    }
+-
+-    NSMutableData *data = [NSMutableData data];
+-    char buf[4096];
+-    ssize_t n;
+-    while ((n = read(outfd[0], buf, sizeof(buf))) > 0) {
+-        [data appendBytes:buf length:(NSUInteger)n];
+-    }
+-    close(outfd[0]);
+-    waitpid(pid, NULL, 0);
+-    posix_spawn_file_actions_destroy(&actions);
+-    return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+-}
+-
+-@interface EUPMPackagesViewController () <UITableViewDataSource, UITableViewDelegate>
+-@property (nonatomic, strong) UITableView *tableView;
+-@property (nonatomic, strong) NSArray<NSDictionary<NSString *, NSString *> *> *entries;
+-@property (nonatomic, strong) NSArray<NSDictionary<NSString *, NSString *> *> *fixedSources; // R14 v2 文件层 SSOT
+-@property (nonatomic, strong) UILabel *statusLabel;
+-@property (nonatomic) BOOL loading;
+-@end
+-
+-@implementation EUPMPackagesViewController
+-
+-- (void)viewDidLoad
+-{
+-    [super viewDidLoad];
+-    self.title = @"EPM · 仙市（自研）";
+-    self.view.backgroundColor = [UIColor blackColor];
+-    // B 固定源区 UI（R14 v2 §6.3-b 兑现层）：强制暗色沉浸 + 下拉刷新
+-    if (@available(iOS 13.0, *)) self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+-
+-    self.navigationItem.rightBarButtonItem =
+-        [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh
+-                                                      target:self
+-                                                      action:@selector(reloadList)];
+-
+-    _statusLabel = [[UILabel alloc] init];
+-    _statusLabel.textColor = [UIColor whiteColor];
+-    _statusLabel.font = [UIFont systemFontOfSize:14];
+-    _statusLabel.textAlignment = NSTextAlignmentCenter;
+-    _statusLabel.numberOfLines = 0;
+-    _statusLabel.text = @"EPM v1：已装清单浏览（自研通道）\n安装/升级/搜索=下批";
+-    _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+-    [self.view addSubview:_statusLabel];
+-
+-    _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+-    _tableView.dataSource = self;
+-    _tableView.delegate = self;
+-    _tableView.backgroundColor = [UIColor clearColor];
+-    _tableView.rowHeight = 52;
+-    _tableView.translatesAutoresizingMaskIntoConstraints = NO;
+-    [self.view addSubview:_tableView];
+-
+-    UIRefreshControl *refresh = [[UIRefreshControl alloc] init];
+-    [refresh addTarget:self action:@selector(refreshPulled:)
+-             forControlEvents:UIControlEventValueChanged];
+-    if (@available(iOS 10.0, *)) {
+-        _tableView.refreshControl = refresh;
+-    } else {
+-        [_tableView addSubview:refresh]; // iOS 9 兜底
+-    }
+-
+-    [NSLayoutConstraint activateConstraints:@[
+-        [_statusLabel.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:8],
+-        [_statusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:16],
+-        [_statusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
+-        [_tableView.topAnchor constraintEqualToAnchor:_statusLabel.bottomAnchor constant:8],
+-        [_tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+-        [_tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+-        [_tableView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+-    ]];
+-
+-    [self reloadList];
+-}
+-
+-- (void)refreshPulled:(UIRefreshControl *)sender
+-{
+-    [sender endRefreshing];
+-    [self reloadList];
+-}
+-
+-- (void)reloadList
+-{
+-    if (_loading) return;
+-    _loading = YES;
+-    _statusLabel.text = @"正在读取 dpkg 数据库…";
+-
+-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+-        // 越狱态判定（EPM 通道=bootstrap 的 dpkg；未越狱时诚实告知）
+-        if (![[EUEnvironmentManager sharedManager] isJailbroken]) {
+-            dispatch_async(dispatch_get_main_queue(), ^{
+-                self->_loading = NO;
+-                self->_statusLabel.text = @"EPM 需越狱后使用（dpkg 通道未就绪）";
+-                self->_entries = @[];
+-                [self->_tableView reloadData];
+-            });
+-            return;
+-        }
+-
+-        __block NSString *output = nil;
+-        __block NSMutableArray<NSDictionary<NSString *, NSString *> *> *sources = [NSMutableArray array];
+-        [[EUEnvironmentManager sharedManager] runAsRoot:^{
+-            output = EUPMCaptureCommandOutput(@(JBROOT_PATH("/bin/dpkg"))
+-                                              ?: @"/var/jb/bin/dpkg",
+-                                              @[@("-l")]);
+-
+-            // R14 v2（ADR §6.3-b）：文件层=SSOT——EPM 固定源区直读
+-            // /var/jb/etc/apt/sources.list.d/*.list（每次刷新即文件层真态；
+-            // Sileo db 层删除不影响这里显示——"删不掉"体验的兑现层）
+-            NSString *sourcesDir = @(JBROOT_PATH("/etc/apt/sources.list.d"))
+-                                    ?: @"/var/jb/etc/apt/sources.list.d";
+-            NSArray *files = [[NSFileManager defaultManager]
+-                contentsOfDirectoryAtPath:sourcesDir error:nil];
+-            for (NSString *f in [files sortedArrayUsingSelector:@selector(compare:)]) {
+-                if (![f hasSuffix:@".list"]) continue;
+-                NSString *p = [sourcesDir stringByAppendingPathComponent:f];
+-                NSString *content = [NSString stringWithContentsOfFile:p
+-                    encoding:NSUTF8StringEncoding error:nil];
+-                // 锁定态：lstat st_flags & UF_IMMUTABLE（chflags 层2 防呆是否在位）
+-                struct stat st;
+-                BOOL locked = (lstat(p.fileSystemRepresentation, &st) == 0)
+-                              && (st.st_flags & UF_IMMUTABLE);
+-                NSString *url = @"";
+-                for (NSString *line in [content componentsSeparatedByString:@"\n"]) {
+-                    NSString *t = [line stringByTrimmingCharactersInSet:
+-                        [NSCharacterSet whitespaceCharacterSet]];
+-                    if ([t hasPrefix:@"deb "]) { url = t; break; }
+-                }
+-                [sources addObject:@{
+-                    @"file":     f,
+-                    @"url":      url.length ? url : @"（空）",
+-                    @"locked":   locked ? @"🔒 已锁定" : @"（未锁：下次越狱补锁）",
+-                    @"isLocked": @(locked), // B 固定源区 UI：锁定态着色/详情交互数据位
+-                }];
+-            }
+-        }];
+-
+-        // dpkg -l 输出解析：ii 行（包名/版本/描述）
+-        NSMutableArray<NSDictionary<NSString *, NSString *> *> *parsed = [NSMutableArray array];
+-        if (output.length > 0) {
+-            for (NSString *line in [output componentsSeparatedByString:@"\n"]) {
+-                if (![line hasPrefix:@"ii "]) continue;
+-                NSArray *cols = [line componentsSeparatedByString:@"  "]; // dpkg 定宽列以多空格分隔
+-                NSMutableArray *nonEmpty = [NSMutableArray array];
+-                for (NSString *c in cols) {
+-                    NSString *t = [c stringByTrimmingCharactersInSet:
+-                        [NSCharacterSet whitespaceCharacterSet]];
+-                    if (t.length > 0) [nonEmpty addObject:t];
+-                }
+-                if (nonEmpty.count < 3) continue;
+-                [parsed addObject:@{
+-                    @"name":    nonEmpty[1],
+-                    @"version": nonEmpty[2],
+-                    @"desc":    nonEmpty.count > 3 ? nonEmpty[3] : @"",
+-                }];
+-            }
+-        }
+-
+-        dispatch_async(dispatch_get_main_queue(), ^{
+-            self->_loading = NO;
+-            self->_entries = parsed.copy;
+-            self->_fixedSources = sources.copy;
+-            self->_statusLabel.text = output
+-                ? [NSString stringWithFormat:@"已装 %tu 包 · 固定源 %tu 条（文件层 SSOT）",
+-                    parsed.count, sources.count]
+-                : @"dpkg 读取失败（通道异常，见日志）";
+-            [self->_tableView reloadData];
+-        });
+-    });
+-}
+-
+-#pragma mark - UITableView
+-
+-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+-{
+-    return 2; // 0=固定源区（R14 v2 文件层 SSOT） 1=已装包清单
+-}
+-
+-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+-{
+-    if (section == 0) {
+-        // B 固定源区 UI：空态防呆占位（源未写入时给出路，不留空白区）
+-        return _fixedSources.count > 0 ? _fixedSources.count : 1;
+-    }
+-    return _entries.count;
+-}
+-
+-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+-{
+-    return (section == 0)
+-        ? @"固定源（文件层 · 不可删 · 越狱重放自愈）"
+-        : @"已装包（dpkg）";
+-}
+-
+-- (void)tableView:(UITableView *)tableView willDisplayHeaderView:(UIView *)view forHeaderInSection:(NSInteger)section
+-{
+-    // B 固定源区 UI：暗色沉浸下的段头着色（正文语义不动）
+-    if ([view isKindOfClass:[UITableViewHeaderFooterView class]]) {
+-        UITableViewHeaderFooterView *hv = (UITableViewHeaderFooterView *)view;
+-        hv.textLabel.textColor = [UIColor whiteColor];
+-        hv.contentView.backgroundColor = [UIColor colorWithWhite:0.07 alpha:1.0];
+-    }
+-}
+-
+-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+-{
+-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"epm-cell"];
+-    if (!cell) {
+-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle
+-                                      reuseIdentifier:@"epm-cell"];
+-        cell.backgroundColor = [UIColor clearColor];
+-        cell.textLabel.textColor = [UIColor whiteColor];
+-        cell.detailTextLabel.textColor = [UIColor lightGrayColor];
+-    }
+-    if (indexPath.section == 0) {
+-        // B 固定源区 UI 空态：未越狱/源未预置时的防呆行（指引而非空白）
+-        if (_fixedSources.count == 0) {
+-            BOOL jb = [[EUEnvironmentManager sharedManager] isJailbroken];
+-            cell.textLabel.text = @"（仙籍未载）源文件层为空";
+-            cell.textLabel.textColor = [UIColor systemOrangeColor];
+-            cell.detailTextLabel.text = jb
+-                ? @"重跑一次越狱即写入预置源（chariz/havoc/bigboss 等 + EU 官方源）"
+-                : @"先完成越狱（EPM 的 dpkg 通道随 bootstrap 就绪）";
+-            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+-            return cell;
+-        }
+-        // 固定源区：锁定态着色（🔒 青绿=防呆锁在位 / 琥珀=待补锁）+ URL 副文本
+-        NSDictionary *s = _fixedSources[indexPath.row];
+-        BOOL isLocked = [s[@"isLocked"] boolValue];
+-        cell.textLabel.text = [NSString stringWithFormat:@"%@ %@", s[@"locked"], s[@"file"]];
+-        cell.textLabel.textColor = isLocked
+-            ? [UIColor systemGreenColor] : [UIColor systemOrangeColor];
+-        cell.detailTextLabel.text = s[@"url"];
+-        // 点击=固定源语义说明（"删不掉"完整体验的兑现入口）；删除交互恒不存在
+-        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+-    } else {
+-        NSDictionary *e = _entries[indexPath.row];
+-        cell.textLabel.text = e[@"name"];
+-        cell.textLabel.textColor = [UIColor whiteColor];
+-        cell.detailTextLabel.text = [NSString stringWithFormat:@"%@  %@",
+-            e[@"version"], e[@"desc"] ?: @""];
+-        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+-    }
+-    return cell;
+-}
+-
+-// B 固定源区 UI（ADR-R14 §6.3-b：用户"删不掉"的完整体验由 EPM 层兑现）：
+-// 点击固定源→真态语义弹窗。工程事实口径，不做删除入口。
+-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+-{
+-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+-    if (indexPath.section != 0 || indexPath.row >= _fixedSources.count) return;
+-    NSDictionary *s = _fixedSources[indexPath.row];
+-    BOOL isLocked = [s[@"isLocked"] boolValue];
+-    NSString *msg = isLocked
+-        ? @"此源为固定预置（文件层真态）：\n· Sileo/Zebra 里删除只删它自己的视图，本页显示永远恢复\n· chflags 防呆锁在位——root 亦无法误删\n· 每次越狱幂等重放，文件层自愈"
+-        : @"此源为固定预置（文件层真态）：\n· 暂未上锁（下次越狱重放自动补锁）\n· Sileo/Zebra 里删除不影响文件层，越狱后即恢复";
+-    UIAlertController *alert = [UIAlertController
+-        alertControllerWithTitle:[NSString stringWithFormat:@"固定源 · %@", s[@"file"]]
+-                         message:msg
+-                  preferredStyle:UIAlertControllerStyleAlert];
+-    [alert addAction:[UIAlertAction actionWithTitle:@"知晓" style:UIAlertActionStyleDefault handler:nil]];
+-    [self presentViewController:alert animated:YES completion:nil];
+-}
+-
+-@end
+-
+ // ═══════════════════════════════ 原有 Picker VC ═══════════════════════════════
+ 
+ @interface EUPkgManagerPickerViewController ()
+
+diff -ruN 'v1.3 EPM removal' euphoria-v1007-src/Application/Euphoria/UI/EUMainViewController.m euphoria-v1007-src/Application/Euphoria/UI/EUMainViewController.m
+--- euphoria-v1007-src/Application/Euphoria/UI/EUMainViewController.m	(pre-v1.3 state)
++++ euphoria-v1007-src/Application/Euphoria/UI/EUMainViewController.m	(v1.3 cleanup)
+@@ -125,10 +125,6 @@
+         [UIAction actionWithTitle:[self trolleMenuTitle] image:[UIImage systemImageNamed:@"sparkles" withConfiguration:[EUGlobalAppearance smallIconImageConfiguration]] identifier:@"trolle-install" handler:^(__kindof UIAction * _Nonnull action) {
+             [self.navigationController pushViewController:[[EUTrollEMainViewController alloc] init] animated:YES];
+         }],
+-        // EPM 入口（T18 契约 v1 内嵌页：已装清单+刷新；用户 19:35:28 点名补位）
+-        [UIAction actionWithTitle:@"EPM · 仙市（自研包管理器）" image:[UIImage systemImageNamed:@"shippingbox.fill" withConfiguration:[EUGlobalAppearance smallIconImageConfiguration]] identifier:@"epm-packages" handler:^(__kindof UIAction * _Nonnull action) {
+-            [self.navigationController pushViewController:[[EUPMPackagesViewController alloc] init] animated:YES];
+-        }],
+         [UIAction actionWithTitle:EULocalizedString(@"Menu_Settings_Title") image:[UIImage systemImageNamed:@"gearshape" withConfiguration:[EUGlobalAppearance smallIconImageConfiguration]] identifier:@"settings" handler:^(__kindof UIAction * _Nonnull action) {
+             [self.navigationController pushViewController:[[EUSettingsController alloc] init] animated:YES];
+         }],
+
