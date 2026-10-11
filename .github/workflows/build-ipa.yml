@@ -1,0 +1,136 @@
+# GitHub Actions —— Euphoria/巨魔E 自动构建 IPA/TIPA
+#
+# 用户 2026-09-08 19:17 指令："直接用 GitHub 生成 ipa，把现在能给我的给我"。
+# 用法：本仓库推上 GitHub 后（需 GitHub 账号+PAT——注册被 DataDome IP 墙所阻，
+# 等管理员提供现成账号，或用户提供），本文件随源码树 push 即生效：
+#   · 手动触发：Actions 页选 "build-ipa" → Run workflow
+#   · 自动触发：打 tag（v*）即构建并挂 Release
+# 产物（Artifacts/Release 附件，网页直接下载）：
+#   · TrollE-Installer.tipa / .ipa（巨魔E 安装器——CT/巨魔通道与侧载双通道）
+#   · Euphoria.tipa（巨魔E 本体——主 App，随包可内嵌安装器 payload）
+#
+# Runner：macos-latest（自带 Xcode+iOS SDK；私有仓免费 2000 分钟/月）。
+# ⚠️ Codeberg（Woodpecker CI）无 macOS runner——iOS 构建只能走 GitHub Actions
+#   或本地 Mac，这是选 GitHub 做构建载体的技术原因。
+#
+# 落码：并行搜索员C，2026-09-08。
+
+name: build-ipa
+
+# GITHUB_TOKEN 默认只读时会 403（Resource not accessible by integration），
+# Release 需要 contents: write。
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch: {}          # 手动触发
+  push:
+    tags: ['v*']                 # 打 tag 自动构建+Release
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 200
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 依赖（ldid/dpkg/libarchive/theos）
+        run: |
+          brew install dpkg libarchive || true
+          # ldid：brew 版对目录递归 -s 有 flag_S 断言；Procursus 版为越狱工具链事实标准
+          curl -fsSL "https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macosx_arm64" -o /tmp/ldid
+          chmod +x /tmp/ldid
+          sudo mv /tmp/ldid /usr/local/bin/ldid || true
+          # brew 版 ldid 对目录递归 `-s` 会触发 flag_S 断言；越狱工具链事实标准是
+          # Procursus ldid（主树 main.yml 同款），直接取官方预编译二进制。
+          curl -fsSL "https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macosx_arm64" -o /tmp/ldid
+          chmod +x /tmp/ldid
+          sudo mv /tmp/ldid /usr/local/bin/ldid
+          ldid -V || true
+          # theos：BaseBin 的 opainject/rootlesshooks 子项目 Makefile 依赖
+          # （include $(THEOS)/makefiles/common.mk）——runner 不预装，必须克隆。
+          # TARGET 若写死 iphone:clang:16.5 而本机 SDK 更新：theos 仅警告并取
+          # 最高可用版本，属可跑警告（并行搜索员C 19:30 指示的修法）。
+          git clone --recursive https://github.com/theos/theos.git ~/theos
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcrun -sdk iphoneos -show-sdk-version
+          # theos 硬校验 TARGET 写死的 iPhoneOS16.5.sdk——runner 只有新 SDK（17.x/18.x），
+          # symlink 顶名（2026-09-09 C 修复：根因「SDK does not appear to exist」）
+          # $THEOS 在 GITHUB_ENV 写入当步不生效（实测 mkdir /sdks 只读炸）——绝对路径版
+          mkdir -p "$HOME/theos/sdks"
+          ln -sfn "$(xcrun --sdk iphoneos --show-sdk-path)" "$HOME/theos/sdks/iPhoneOS16.5.sdk"
+          # trustcache 工具（主树装配 `trustcache create .build/basebin.tc` 需要——
+          # 上游 CRKatri/trustcache，runner 不预装；r26 实测 No such file or directory）
+          git clone -q https://github.com/CRKatri/trustcache.git /tmp/trustcache
+          make -C /tmp/trustcache OPENSSL=1 \
+            CFLAGS="-DOPENSSL -I/opt/homebrew/opt/openssl@3/include" \
+            LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"
+          sudo cp /tmp/trustcache/trustcache /usr/local/bin/trustcache
+          which trustcache
+
+      # ① 巨魔E 安装器（独立工程五步链：ChOma→libjailbreak→Exploits→src→装配）
+      - name: 构建 TrollE-Installer（.tipa/.ipa）
+        run: |
+          cd TrollE-Installer
+          make
+          ls -la build/
+
+      - name: 探针（SDK 私有框架实况）
+        run: |
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          echo "SDK=$SDK"
+          ls "$SDK/System/Library/PrivateFrameworks/" | grep -i -E "symbolication|symbol" || echo "NO CoreSymbolication in iOS SDK"
+          ls "$SDK/System/Library/Frameworks/" | head -5 || true
+          ls ~/theos/sdks/ || true
+
+      # ② 巨魔E 本体（主 App：BaseBin→Packages→Application→Euphoria.tipa）
+      #    并把本体投放安装器 payload/（安装器"内置巨魔E"随包）
+      - name: 构建 Euphoria 本体（.tipa）+ 投放安装器 payload
+        id: build-main
+        run: |
+          # App 内嵌 bootstrap 资源（.gitignore 设计不入库——CI 现场下载官方源，
+          # v1.0.3 Error 65 根因：Copy Bundle Resources 引用存在但文件缺失）
+          cd Application/Euphoria/Resources
+          bash download_bootstraps.sh
+          cd ../../..
+          make trolle-payload || echo "::warning::主树构建失败（见日志）——安装器仍已产出"
+          ls -la Application/*.tipa 2>/dev/null || true
+          ls -la TrollE-Installer/payload/ 2>/dev/null || true
+
+      # ③ 带 payload 的安装器重打（若②成功）——最终"内置巨魔E"安装器
+      - name: 重打安装器（含内置巨魔E 本体）
+        if: steps.build-main.outcome == 'success'
+        run: |
+          if [ -f TrollE-Installer/payload/Euphoria.tipa ]; then
+            cd TrollE-Installer && make
+          fi
+
+      - name: 上传产物（Artifacts）
+        uses: actions/upload-artifact@v4
+        with:
+          name: Euphoria-builds
+          path: |
+            TrollE-Installer/build/*.tipa
+            TrollE-Installer/build/*.ipa
+            Application/Euphoria.tipa
+          if-no-files-found: error
+
+      # 主 App 独立产物+硬缺失红——防 make trolle-payload 软失败吞错（2026-09-09 C：
+      # 曾出现八步全绿但产物无 Euphoria.tipa 的假绿，本段让主 App 缺失直接红）
+      - name: 上传主 App（硬校验）
+        uses: actions/upload-artifact@v4
+        with:
+          name: Euphoria-app-tipa
+          path: Application/Euphoria.tipa
+          if-no-files-found: error
+
+      - name: 挂 Release（仅 tag 触发）
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            TrollE-Installer/build/*.tipa
+            TrollE-Installer/build/*.ipa
+            Application/Euphoria.tipa

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Euphoria EU 官方源</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif;background:#0d0f14;color:#e8eaef;min-height:100vh;display:flex;justify-content:center;padding:32px 16px}
+.card{max-width:640px;width:100%}
+h1{font-size:26px;font-weight:700;letter-spacing:.5px}
+h1 .accent{color:#5ac8fa}
+.tagline{color:#9aa3b2;font-size:14px;margin:6px 0 24px}
+.urlbox{background:#151922;border:1px solid #2a3140;border-radius:12px;padding:16px;margin-bottom:24px}
+.urlbox .label{font-size:12px;color:#9aa3b2;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.urlbox code{font-family:ui-monospace,Menlo,monospace;font-size:15px;color:#5ac8fa;word-break:break-all}
+h2{font-size:16px;font-weight:600;margin:28px 0 12px;color:#c6ccd8}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:10px 12px;text-align:left;border-bottom:1px solid #232a37}
+th{color:#9aa3b2;font-weight:500;font-size:12px}
+td b{font-weight:600}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:500}
+.pill.ok{background:#12291c;color:#4cd07d;border:1px solid #1d4a2e}
+.pill.beta{background:#2a2113;color:#e0b34a;border:1px solid #4a3a1d}
+.note{font-size:12px;color:#9aa3b2;line-height:1.7}
+.note b{color:#c6ccd8}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid #232a37;font-size:11px;color:#6b7280;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Euphoria <span class="accent">EU</span> 官方源</h1>
+<p class="tagline">Flat 结构 · 签名源 · Sileo / Zebra 通用 · 由 Euphoria 项目组维护</p>
+
+<div class="urlbox">
+<div class="label">源地址（在 Sileo「源」页添加）</div>
+<code>https://euphoria-repo.surge.sh/</code>
+</div>
+
+<h2>池内包（3）</h2>
+<table>
+<tr><th>包名</th><th>版本</th><th>状态</th></tr>
+<tr><td><b>dev.euphoria.trolle-installer</b></td><td>0.9.1-3</td><td><span class="pill ok">真载荷·已修 ElleKit</span></td></tr>
+<tr><td><b>euphoria-basebin-link</b></td><td>1.0.0</td><td><span class="pill ok">真实成品</span></td></tr>
+<tr><td><b>launchctl</b></td><td>1:1.2.0</td><td><span class="pill ok">真实成品</span></td></tr>
+</table>
+<p class="note" style="margin-top:10px">说明：trolle-installer 为完整源码分发包（21.5MB，含引擎 B/C 修复与构建文档），安装到 /var/jb/usr/share/TrollE-Installer/；其依赖 basebin-link 已在本源内闭合。launchctl 的 libiosexec1 依赖由设备侧越狱环境提供（Procursus 系越狱默认自带）。</p>
+
+<h2>源显示"无效/无法使用"？三步排障（常见于换包后缓存）</h2>
+<p class="note">
+本源包会持续更新（如 0.9.1-2 → 0.9.1-3）。Sileo 若缓存了旧索引，会去拉已下架的旧文件名导致 404、源显示无效。解法：<br>
+① Sileo「源」页左上角 → 选中本源 → 删除；<br>
+② 重新添加：<code>https://euphoria-repo.surge.sh/</code>（原样复制，含结尾斜杠）；<br>
+③ 若仍无效：Sileo 设置 → 清除缓存（Clear Cache / 刷新所有源），再回到第②步。<br>
+首次添加如提示"签名不受信任"属正常（见下方签名信息，可跳过或导入公钥）。
+</p>
+
+<h2>签名信息</h2>
+<p class="note">本源使用 ed25519 密钥签名（InRelease 内嵌 + Release.gpg 分离双路径），指纹短 ID <b>6FE1C7C9</b>。公钥随源分发：<b>euphoria-repo.pub.asc</b>。Sileo 首次添加如提示签名不受信任，属正常流程（可导入公钥或跳过校验）。</p>
+
+<div class="foot">
+Euphoria 项目 · 越狱与巨魔E 安装器 · 源内容与主树同步（eu-repo/）<br>
+致谢：mg13-14 + AI 辅助（GLM / 清言 AgentMore 等）· 仅供学习研究，请于 24 小时内自设备移除越狱相关内容的使用风险自担
+</div>
+</div>
+</body>
+</html>

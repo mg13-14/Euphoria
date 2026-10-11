@@ -1,0 +1,11 @@
+Package: euphoria-basebin-link
+Name: Euphoria BaseBin Link
+Author: opa334 <opa334@protonmail.com>
+Maintainer: opa334 <opa334@protonmail.com>
+Architecture: iphoneos-arm64
+Version: 1.0.0
+Provides: opainject
+Section: Libraries
+Priority: standard
+Homepage: https://github.com/euphoria-jb/Euphoria/tree/main/BaseBin
+Description: Symlinks to Euphoria Base Binaries

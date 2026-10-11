@@ -1,0 +1,12 @@
+[submodule "BaseBin/ChOma"]
+	path = BaseBin/ChOma
+	url = https://github.com/opa334/ChOma
+[submodule "BaseBin/XPF"]
+	path = BaseBin/XPF
+	url = https://github.com/opa334/XPF
+[submodule "BaseBin/opainject"]
+	path = BaseBin/opainject
+	url = https://github.com/opa334/opainject
+[submodule "BaseBin/_external/modules/litehook"]
+	path = BaseBin/_external/modules/litehook
+	url = https://github.com/opa334/litehook

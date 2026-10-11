@@ -1,0 +1,33 @@
+#!/bin/sh
+# TrollE-Installer postinst（越狱态 deb 安装钩子——对齐 eu-repo 源骨架语义）
+# 独立版：无 basebin 依赖，仅目录自检+致谢。
+
+# 0.9.1-8 修复（B 线）：①$1 是 dpkg action（configure）非安装前缀——原
+# ${1:-/var/jb} 恒为 "configure"（潜伏 bug）；②数据段改 var/jb/ 前缀（与
+# Procursus 官方包同形式——dpkg 以真根为 instdir 解包，usr/share 直落真根
+# 只读区=用户 09-07 截图 Read-only 报错的根因）。
+INSTALLED_PREFIX="${DPKG_ROOT:-}/var/jb"
+echo "TrollE-Installer（独立版）postinst：安装前缀=${INSTALLED_PREFIX}"
+
+# 目录自检（0.9.1-8 起真实落点）
+if [ -d "${INSTALLED_PREFIX}/usr/share/TrollE-Installer" ]; then
+  echo "✅ 源码存档就位：${INSTALLED_PREFIX}/usr/share/TrollE-Installer（Mac 构建用）"
+else
+  echo "⚠️ 源码目录未落位（见 dpkg 输出）——回报 B 线带完整日志"
+fi
+echo "ℹ️ 本包=安装器工程源码存档（装上无桌面图标属正常）；巨魔E 本体 App 为独立发布线"
+
+# 致谢（对齐 trolle-installer v0.9.1 骨架口径 + 项目致谢契约 2026-08-27：含 mg13-14 与所用大模型）
+echo ""
+echo "致谢："
+echo "  - mg13-14"
+echo "  - opa334/TrollStore（CoreTrust 永久签名语义与 custom 安装法先例）"
+echo "  - alfiecg24/TrollInstallerX（免越狱侧载安装器形态先例）"
+echo "  - Dopamine/libjailbreak（KRW 抽象层与漏洞框架）"
+echo "  - JJTech0130（sparserestore 通道情报）"
+echo ""
+echo "AI Assistance："
+echo "  - 清言 AgentMore（并行搜索员A/B/C、搜索规划师、报告汇总员）"
+echo "  - GLM-5.3 大模型（Z.ai·当前主力）"
+echo ""
+exit 0

@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Alert_Change_Mobile_Password_Body</key>
+	<string>这将会在你的设备上修改 “mobile” 密码，此密码可用于使用 sudo 命令。如需设置 “root” 密码，请在 shell 中使用命令 “sudo passwd root”。</string>
+	<key>Alert_Remove_Jailbreak_Enabled_Body</key>
+	<string>“移除越狱” 将在下次越狱时移除所有和越狱相关的文件，而常规的 App、文档及数据不会受到任何影响。请注意，此操作无法撤销。确认要移除越狱吗？</string>
+	<key>Alert_Remove_Jailbreak_Pressed_Body</key>
+	<string>“移除越狱” 将移除所有和越狱相关的文件，而常规的 App、文档及数据不会受到任何影响。请注意，此操作无法撤销。确认要移除越狱吗？</string>
+	<key>Alert_Remove_Jailbreak_Title</key>
+	<string>移除越狱</string>
+	<key>Alert_Tweak_Injection_Toggled_Body</key>
+	<string>需要重启用户空间才能应用更改，是否现在重启？</string>
+	<key>Alert_Tweak_Injection_Toggled_Reboot_Later</key>
+	<string>稍后重启</string>
+	<key>Alert_Tweak_Injection_Toggled_Reboot_Now</key>
+	<string>立即重启</string>
+	<key>Alert_Tweak_Injection_Toggled_Title</key>
+	<string>需要重启用户空间</string>
+	<key>Apply_Workaround</key>
+	<string>应用临时方案</string>
+	<key>Applying Bind Mount</key>
+	<string>应用绑定挂载</string>
+	<key>Building Phys R/W Primitive</key>
+	<string>构建硬件读写条件</string>
+	<key>Button_Cancel</key>
+	<string>取消</string>
+	<key>Button_Change</key>
+	<string>修改</string>
+	<key>Button_Change_Mobile_Password</key>
+	<string>修改 “mobile” 密码</string>
+	<key>Button_Close</key>
+	<string>关闭</string>
+	<key>Button_Continue</key>
+	<string>继续</string>
+	<key>Button_Jailbreak_Title</key>
+	<string>越狱</string>
+	<key>Button_Reboot</key>
+	<string>重启</string>
+	<key>Button_Refresh_Jailbreak_Apps</key>
+	<string>刷新越狱 App</string>
+	<key>Button_Reinstall_Package_Managers</key>
+	<string>重新安装包管理器</string>
+	<key>Button_Remove_Jailbreak</key>
+	<string>移除越狱</string>
+	<key>Button_Share</key>
+	<string>分享</string>
+	<key>Button_Update</key>
+	<string>更新</string>
+	<key>Button_Update_Available</key>
+	<string>有更新可用</string>
+	<key>Button_Update_Environment</key>
+	<string>更新环境</string>
+	<key>Bypassing PAC (%@)</key>
+	<string>正在绕过 PAC (%@)</string>
+	<key>Bypassing PPL (%@)</key>
+	<string>正在绕过 PPL (%@)</string>
+	<key>Bypassing SPTM (%@)</key>
+	<string>正在绕过 SPTM (%@)</string>
+	<key>Changelog_Unavailable_Text</key>
+	<string>更新日志不可用</string>
+	<key>Cleaning Up Exploits</key>
+	<string>清理环境</string>
+	<key>Continue</key>
+	<string>继续</string>
+	<key>Credits_AI_Assistance</key>
+	<string>AI 协作</string>
+	<key>Credits_Button_Discord</key>
+	<string>Discord</string>
+	<key>Credits_Button_License</key>
+	<string>许可证</string>
+	<key>Credits_Button_Source_Code</key>
+	<string>源代码</string>
+	<key>Credits_Made_By</key>
+	<string>Euphoria 团队出品 · 特别致谢 mg13-14 与 GLM-5.3/Z.ai</string>
+	<key>Credits_Special_Thanks</key>
+	<string>特别致谢</string>
+	<key>Custom_Boot_Logo</key>
+	<string>自定义开机图标</string>
+	<key>Duplicate_Apps_Error_Euphoria_App</key>
+	<string>检测到多个标识符为 "%@" 的 App 在 Euphoria 的 App 目录中 ("%@")，无法继续。</string>
+	<key>Duplicate_Apps_Error_Icon_Cache</key>
+	<string>检测到标识符为 "%@" 的 App 存在于 Euphoria 的 App 目录中 ("%@")，但其已在不同路径 ("%@") 下注册了图标缓存，无法继续。</string>
+	<key>Duplicate_Apps_Error_User_App</key>
+	<string>检测到标识符为 "%@" 的 App 存在 Euphoria 的 App 目录中 ("%@") ，但其已被单独安装在系统上，无法继续。</string>
+	<key>Elevating Privileges</key>
+	<string>提升权限</string>
+	<key>Enabled</key>
+	<string>已启用</string>
+	<key>Exploiting Kernel (%@)</key>
+	<string>正在利用内核 (%@)</string>
+	<key>Hide_Jailbreak</key>
+	<string>隐/显越狱</string>
+	<key>Hide_Jailbreak_Apps</key>
+	<string>隐藏越狱应用</string>
+	<key>Hide_Jailbreak_Apps_Footer</key>
+	<string>通过 Aegis 隐藏策略隐藏 Euphoria 图标；隐藏期间可用 Spotlight 搜索或设置找回。</string>
+	<key>Hide_Jailbreak_Footer</key>
+	<string>将 Euphoria 图标从主屏隐藏，可通过 Spotlight 搜索找回（与多巴胺行为一致）。</string>
+	<key>Hide_Jailbreak_Traces</key>
+	<string>隐藏越狱痕迹</string>
+	<key>Hide_Jailbreak_Traces_Footer</key>
+	<string>通过 Cloak 进行系统级隐藏：隐藏越狱挂载点、凭证与信任缓存（roothide 同款语义）。切换后建议重启生效。</string>
+	<key>Initializing Environment</key>
+	<string>初始化环境</string>
+	<key>Initializing Protection</key>
+	<string>初始化保护</string>
+	<key>Jetsam_Description</key>
+	<string>Jetsam 是一个系统守护进程，它会自动终止超过指定内存限制的进程。当安装了大量插件后，某些进程可能在启动时或启动后没多久内存使用超出限制，被 Jetsam 终止，导致进程循环崩溃。你可以选择一个倍数来扩大所有带内存限制进程的限制。如果你的系统在安装了大量插件之后出现频繁崩溃或者各种异常行为，请适当地增加这个倍数。但为了不对系统内存使用产生负面影响，建议选择能够使系统稳定运行的最低倍数。</string>
+	<key>Kernel Exploit</key>
+	<string>内核漏洞</string>
+	<key>Loading BaseBin TrustCache</key>
+	<string>将基础套件加载至信任缓存（TrustCache）</string>
+	<key>Log_Error</key>
+	<string>发生错误</string>
+	<key>Menu_Credits_Title</key>
+	<string>关于</string>
+	<key>Menu_Reboot_Userspace_Title</key>
+	<string>重启用户空间</string>
+	<key>Menu_Restart_SpringBoard_Title</key>
+	<string>重启 SpringBoard</string>
+	<key>Menu_Settings_Title</key>
+	<string>设置</string>
+	<key>None</key>
+	<string>无</string>
+	<key>PAC Bypass</key>
+	<string>PAC 绕过</string>
+	<key>PPL Bypass</key>
+	<string>PPL 绕过</string>
+	<key>Password_Auth_Required</key>
+	<string>修改 mobile 密码需要先通过验证。</string>
+	<key>Password_Placeholder</key>
+	<string>密码</string>
+	<key>Patchfinding</key>
+	<string>查找地址</string>
+	<key>Rebooting Userspace</key>
+	<string>重启用户空间</string>
+	<key>Rebuilding Icon Cache</key>
+	<string>正在重建图标缓存</string>
+	<key>Recommended</key>
+	<string>推荐</string>
+	<key>Removed_Jailbreak_Alert_Message</key>
+	<string>已成功移除越狱，建议重启设备。</string>
+	<key>Removed_Jailbreak_Alert_Title</key>
+	<string>移除越狱</string>
+	<key>Removing Jailbreak</key>
+	<string>移除越狱</string>
+	<key>Repeat_Password_Placeholder</key>
+	<string>重复密码</string>
+	<key>Respring_Cancel</key>
+	<string>取消</string>
+	<key>Respring_Required</key>
+	<string>需要注销（Respring）</string>
+	<key>Respring_Required_Message</key>
+	<string>当前选择的内核漏洞利用需要创建连续内存映射，在你的设备上只有借助一个会触发注销的特殊临时方案才能实现。注销完成后，请重新打开 Euphoria 并再次点击"越狱"。</string>
+	<key>Respring_Required_Notice_A8</key>
+	<string>在你的设备上该临时方案并非每次都生效，可能需要多次应用，直到此提示不再出现为止。</string>
+	<key>Rootful_Mode</key>
+	<string>Rootful 模式</string>
+	<key>Rootful_Mode_Fixed_Footer</key>
+	<string>本构建为固定 Rootful：每次越狱均挂载真实根文件系统，隐藏环境（屏蔽）随之自动开启。模式开关已按设计移除；支持设备为 A12/A13、iOS 16.6.1–18.7.1。运维逃生通道（marker 文件）保留可用。</string>
+	<key>SPTM Bypass</key>
+	<string>SPTM 绕过</string>
+	<key>Section_Actions</key>
+	<string>操作</string>
+	<key>Section_Boot_Logo</key>
+	<string>开机图标</string>
+	<key>Section_Customization</key>
+	<string>自定义</string>
+	<key>Section_Exploits</key>
+	<string>漏洞利用</string>
+	<key>Section_Jailbreak_Settings</key>
+	<string>越狱设置</string>
+	<key>Section_Rootful</key>
+	<string>Rootful（传统挂载）</string>
+	<key>Select_Image</key>
+	<string>选择图片</string>
+	<key>Select_Package_Managers_Install_Message</key>
+	<string>如果你不确定选择哪一个比较好，请选择 Sileo</string>
+	<key>Settings_Allow_Old_arm64e_ABI_Libraries</key>
+	<string>允许旧版 arm64e 库</string>
+	<key>Settings_Apps_JIT</key>
+	<string>允许 App 使用 JIT</string>
+	<key>Settings_Jetsam_Multiplier</key>
+	<string>Jetsam 倍数</string>
+	<key>Settings_Tweak_Injection</key>
+	<string>插件注入</string>
+	<key>Settings_Verbose_Logs</key>
+	<string>详细日志</string>
+	<key>Settings_iDownload</key>
+	<string>iDownload (开发者终端)</string>
+	<key>Status_Title_Jailbreaking</key>
+	<string>正在越狱</string>
+	<key>Status_Title_Jailbroken</key>
+	<string>已越狱</string>
+	<key>Status_Title_Select_Package_Managers</key>
+	<string>请选择包管理器</string>
+	<key>Theme</key>
+	<string>主题</string>
+	<key>Title_Changelog</key>
+	<string>更新日志</string>
+	<key>Unsupported</key>
+	<string>不支持</string>
+	<key>Update_Status_Downloading</key>
+	<string>正在下载更新...</string>
+	<key>Update_Status_Installing</key>
+	<string>正在安装更新...</string>
+	<key>Update_Status_Subtitle_Please_Wait</key>
+	<string>请等待文件下载完成</string>
+	<key>Update_Status_Subtitle_Restart_Soon</key>
+	<string>设备即将重启</string>
+</dict>
+</plist>
